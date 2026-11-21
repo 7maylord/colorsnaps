@@ -132,12 +132,16 @@ export async function decryptClassicBoolean(parameters: {
 export async function decryptPublicBooleanWithProof(parameters: {
   readonly publicClient: PublicClient;
   readonly ciphertext: Hex;
-}): Promise<{ readonly solved: boolean; readonly decryptionProof: Hex }> {
+}): Promise<{ readonly cleartexts: readonly [bigint]; readonly solved: boolean; readonly decryptionProof: Hex }> {
   const fhevm = await createClassicFheClient(parameters.publicClient);
   const result = await fhevm.decryptPublicValuesWithSignatures({ encryptedValues: [parameters.ciphertext] });
   const value = result.clearValues[0];
   if (value.type !== "bool" || typeof value.value !== "boolean") {
     throw new Error("The FHE relayer returned an unexpected public result type.");
   }
-  return { solved: value.value, decryptionProof: result.checkSignaturesArgs.decryptionProof as Hex };
+  return {
+    cleartexts: [BigInt(value.value ? 1 : 0)],
+    solved: value.value,
+    decryptionProof: result.checkSignaturesArgs.decryptionProof as Hex,
+  };
 }

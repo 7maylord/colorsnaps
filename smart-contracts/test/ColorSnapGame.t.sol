@@ -28,7 +28,7 @@ contract ColorSnapGameTest is FhevmTest {
         return userDecrypt(handle, vm.addr(userPk), gameAddress, signUserDecrypt(userPk, gameAddress));
     }
 
-    function encryptFive(uint8[5] memory values)
+    function encryptFive(uint8[5] memory values, address user)
         internal
         returns (externalEuint8[5] memory externalHandles, bytes memory inputProof)
     {
@@ -38,12 +38,13 @@ contract ColorSnapGameTest is FhevmTest {
             bytes memory ciphertext =
                 abi.encodePacked(keccak256(abi.encodePacked(values[i], uint8(FheType.Uint8), encryptNonce)));
             handles[i] =
-                InputProofHelper.computeInputHandle(ciphertext, 0, FheType.Uint8, aclAdd, uint64(block.chainid));
+                InputProofHelper.computeInputHandle(ciphertext, uint8(i), FheType.Uint8, aclAdd, uint64(block.chainid));
+            _plaintexts[handles[i]] = values[i];
             externalHandles[i] = externalEuint8.wrap(handles[i]);
         }
         bytes32 domainSeparator = InputProofHelper.computeInputVerifierDomainSeparator(inputVerifierAdd, block.chainid);
         bytes32 digest = InputProofHelper.computeInputVerificationDigest(
-            handles, gameAddress, gameAddress, block.chainid, EMPTY_EXTRA_DATA, domainSeparator
+            handles, user, gameAddress, block.chainid, EMPTY_EXTRA_DATA, domainSeparator
         );
         bytes[] memory signatures = new bytes[](1);
         signatures[0] = _signDigest(MOCK_INPUT_SIGNER_PK, digest);
@@ -92,7 +93,7 @@ contract ColorSnapGameTest is FhevmTest {
 
     function test_correctEncryptedSolutionCreatesPrivateSuccessResult() public {
         uint256 gameId = createForAlice();
-        (externalEuint8[5] memory submitted, bytes memory proof) = encryptFive(targetForAlice(gameId));
+        (externalEuint8[5] memory submitted, bytes memory proof) = encryptFive(targetForAlice(gameId), alice.addr);
         vm.prank(alice.addr);
         game.submitSolution(gameId, submitted, proof);
 
@@ -109,7 +110,7 @@ contract ColorSnapGameTest is FhevmTest {
     function test_wrongEncryptedSolutionCreatesPrivateFailureResult() public {
         uint256 gameId = createForAlice();
         uint8[5] memory wrong = [uint8(0), 0, 0, 0, 0];
-        (externalEuint8[5] memory submitted, bytes memory proof) = encryptFive(wrong);
+        (externalEuint8[5] memory submitted, bytes memory proof) = encryptFive(wrong, alice.addr);
         vm.prank(alice.addr);
         game.submitSolution(gameId, submitted, proof);
 
@@ -120,7 +121,7 @@ contract ColorSnapGameTest is FhevmTest {
 
     function test_cannotSubmitTwiceOrForAnotherPlayer() public {
         uint256 gameId = createForAlice();
-        (externalEuint8[5] memory submitted, bytes memory proof) = encryptFive(targetForAlice(gameId));
+        (externalEuint8[5] memory submitted, bytes memory proof) = encryptFive(targetForAlice(gameId), alice.addr);
         vm.prank(alice.addr);
         game.submitSolution(gameId, submitted, proof);
 

@@ -48,7 +48,7 @@ export const colorSnapChallengeAbi = [
     inputs: [
       { name: "challengeId", type: "uint256" },
       { name: "player", type: "address" },
-      { name: "solved", type: "bool" },
+      { name: "cleartexts", type: "uint256[]" },
       { name: "decryptionProof", type: "bytes" },
     ],
     outputs: [],

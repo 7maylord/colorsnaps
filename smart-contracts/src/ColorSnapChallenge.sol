@@ -130,17 +130,23 @@ contract ColorSnapChallenge is ZamaEthereumConfig {
 
     /// @notice Verifies the KMS proof for the only public cleartext: whether
     /// the player solved the challenge. It cannot reveal the target or input.
-    function finalizeResult(uint256 challengeId, address player, bool solved, bytes calldata decryptionProof) external {
+    function finalizeResult(
+        uint256 challengeId,
+        address player,
+        uint256[] calldata cleartexts,
+        bytes calldata decryptionProof
+    ) external {
         Challenge storage c = challenges[challengeId];
         uint256 playerIndex = _playerIndex(c, player);
         require(c.submitted[playerIndex], "Solution not submitted");
         require(!c.finalized[playerIndex], "Result finalized");
+        require(cleartexts.length == 1 && cleartexts[0] <= 1, "Invalid result");
         bytes32[] memory handles = new bytes32[](1);
         handles[0] = FHE.toBytes32(c.solved[playerIndex]);
-        FHE.checkSignatures(handles, abi.encode(solved), decryptionProof);
+        FHE.checkSignatures(handles, abi.encode(cleartexts), decryptionProof);
         c.finalized[playerIndex] = true;
-        c.clearSolved[playerIndex] = solved;
-        emit ResultFinalized(challengeId, player, solved);
+        c.clearSolved[playerIndex] = cleartexts[0] == 1;
+        emit ResultFinalized(challengeId, player, cleartexts[0] == 1);
     }
 
     /// @notice Returns the encrypted win/loss handle after a submission. The

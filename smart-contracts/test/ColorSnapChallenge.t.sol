@@ -45,7 +45,7 @@ contract ColorSnapChallengeTest is FhevmTest {
         }
     }
 
-    function encryptFive(uint8[5] memory values)
+    function encryptFive(uint8[5] memory values, address user)
         internal
         returns (externalEuint8[5] memory externalHandles, bytes memory inputProof)
     {
@@ -55,12 +55,13 @@ contract ColorSnapChallengeTest is FhevmTest {
             bytes memory ciphertext =
                 abi.encodePacked(keccak256(abi.encodePacked(values[i], uint8(FheType.Uint8), encryptNonce)));
             handles[i] =
-                InputProofHelper.computeInputHandle(ciphertext, 0, FheType.Uint8, aclAdd, uint64(block.chainid));
+                InputProofHelper.computeInputHandle(ciphertext, uint8(i), FheType.Uint8, aclAdd, uint64(block.chainid));
+            _plaintexts[handles[i]] = values[i];
             externalHandles[i] = externalEuint8.wrap(handles[i]);
         }
         bytes32 domainSeparator = InputProofHelper.computeInputVerifierDomainSeparator(inputVerifierAdd, block.chainid);
         bytes32 digest = InputProofHelper.computeInputVerificationDigest(
-            handles, challengeAddress, challengeAddress, block.chainid, EMPTY_EXTRA_DATA, domainSeparator
+            handles, user, challengeAddress, block.chainid, EMPTY_EXTRA_DATA, domainSeparator
         );
         bytes[] memory signatures = new bytes[](1);
         signatures[0] = _signDigest(MOCK_INPUT_SIGNER_PK, digest);
@@ -68,7 +69,7 @@ contract ColorSnapChallengeTest is FhevmTest {
     }
 
     function submitFor(uint256 challengeId, Account memory player, uint8[5] memory solution) internal {
-        (externalEuint8[5] memory submitted, bytes memory proof) = encryptFive(solution);
+        (externalEuint8[5] memory submitted, bytes memory proof) = encryptFive(solution, player.addr);
         vm.prank(player.addr);
         challenge.submitSolution(challengeId, submitted, proof);
     }
@@ -78,7 +79,7 @@ contract ColorSnapChallengeTest is FhevmTest {
         bytes32[] memory handles = new bytes32[](1);
         handles[0] = FHE.toBytes32(result);
         (uint256[] memory cleartexts, bytes memory proof) = publicDecrypt(handles);
-        challenge.finalizeResult(challengeId, player, cleartexts[0] == 1, proof);
+        challenge.finalizeResult(challengeId, player, cleartexts, proof);
     }
 
     function test_playersPrivatelyDecryptTheSameRandomPuzzle() public {
