@@ -76,7 +76,8 @@ contract ColorSnapScript is Script {
         if (_runVerification(inputs)) {
             console.log("SUCCESS: Contract verified successfully!");
         } else {
-            console.log("ERROR: Verification failed, see output above");
+            console.log("ERROR: Verification failed; run forge script with --ffi or use the manual command below");
+            logVerificationCommand();
         }
     }
 
