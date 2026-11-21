@@ -29,6 +29,7 @@ export const config = wagmiAdapter.wagmiConfig
 // Contract addresses for different networks
 export const CONTRACT_ADDRESSES = {
   ZAMA_SEPOLIA: process.env.NEXT_PUBLIC_COLOR_SNAP_FHE_ADDRESS,
+  ZAMA_CHALLENGE_SEPOLIA: process.env.NEXT_PUBLIC_COLOR_SNAP_CHALLENGE_ADDRESS,
   BASE: process.env.NEXT_PUBLIC_BASE_CONTRACT_ADDRESS,
   BASE_SEPOLIA: process.env.NEXT_PUBLIC_BASE_SEPOLIA_CONTRACT_ADDRESS,
   SOMNIA: process.env.NEXT_PUBLIC_SOMNIA_CONTRACT_ADDRESS,

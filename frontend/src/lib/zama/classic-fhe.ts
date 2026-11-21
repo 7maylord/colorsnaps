@@ -123,3 +123,21 @@ export async function decryptClassicBoolean(parameters: {
   }
   return value.value;
 }
+
+/**
+ * Fetches a publicly decryptable win/loss result and the KMS proof that the
+ * challenge contract requires before it records that result. No wallet permit
+ * is needed: the contract has deliberately made this single boolean public.
+ */
+export async function decryptPublicBooleanWithProof(parameters: {
+  readonly publicClient: PublicClient;
+  readonly ciphertext: Hex;
+}): Promise<{ readonly solved: boolean; readonly decryptionProof: Hex }> {
+  const fhevm = await createClassicFheClient(parameters.publicClient);
+  const result = await fhevm.decryptPublicValuesWithSignatures({ encryptedValues: [parameters.ciphertext] });
+  const value = result.clearValues[0];
+  if (value.type !== "bool" || typeof value.value !== "boolean") {
+    throw new Error("The FHE relayer returned an unexpected public result type.");
+  }
+  return { solved: value.value, decryptionProof: result.checkSignaturesArgs.decryptionProof as Hex };
+}

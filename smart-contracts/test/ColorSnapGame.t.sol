@@ -65,11 +65,9 @@ contract ColorSnapGameTest is FhevmTest {
 
     function test_createClassicGameCreatesPrivateActivePuzzle() public {
         uint256 gameId = createForAlice();
-        (address player, ColorSnapGame.GameStatus status, uint256 deadline,,, uint256 submittedAt) =
-            game.getGame(gameId);
+        (address player, ColorSnapGame.GameStatus status,,, uint256 submittedAt) = game.getGame(gameId);
         assertEq(player, alice.addr);
         assertEq(uint8(status), uint8(ColorSnapGame.GameStatus.ACTIVE));
-        assertGt(deadline, block.timestamp);
         assertEq(submittedAt, 0);
     }
 
@@ -98,7 +96,7 @@ contract ColorSnapGameTest is FhevmTest {
         vm.prank(alice.addr);
         game.submitSolution(gameId, submitted, proof);
 
-        (, ColorSnapGame.GameStatus status,,, bool hasSubmission, uint256 submittedAt) = game.getGame(gameId);
+        (, ColorSnapGame.GameStatus status,, bool hasSubmission, uint256 submittedAt) = game.getGame(gameId);
         assertEq(uint8(status), uint8(ColorSnapGame.GameStatus.SOLUTION_SUBMITTED));
         assertTrue(hasSubmission);
         assertGt(submittedAt, 0);
@@ -134,30 +132,6 @@ contract ColorSnapGameTest is FhevmTest {
         vm.prank(bob.addr);
         vm.expectRevert("Not your game");
         game.submitSolution(otherGame, submitted, proof);
-    }
-
-    function test_cannotSubmitAfterDeadlineAndAnyoneCanExpire() public {
-        uint256 gameId = createForAlice();
-        uint8[5] memory target = targetForAlice(gameId);
-        (externalEuint8[5] memory submitted, bytes memory proof) = encryptFive(target);
-        vm.warp(block.timestamp + 301);
-
-        vm.prank(alice.addr);
-        vm.expectRevert("Game expired");
-        game.submitSolution(gameId, submitted, proof);
-
-        vm.prank(bob.addr);
-        game.expireGame(gameId);
-        (, ColorSnapGame.GameStatus status,,,,) = game.getGame(gameId);
-        assertEq(uint8(status), uint8(ColorSnapGame.GameStatus.EXPIRED));
-    }
-
-    function test_cannotCancelAfterDeadline() public {
-        uint256 gameId = createForAlice();
-        vm.warp(block.timestamp + 301);
-        vm.prank(alice.addr);
-        vm.expectRevert("Game expired");
-        game.endGame(gameId);
     }
 
     function test_resultCannotBeRetrievedBeforeSubmission() public {

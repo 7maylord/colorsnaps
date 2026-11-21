@@ -45,7 +45,6 @@ export const colorSnapFheAbi = [
     inputs: [
       { indexed: true, name: "gameId", type: "uint256" },
       { indexed: true, name: "player", type: "address" },
-      { indexed: false, name: "deadline", type: "uint256" },
     ],
   },
 ] as const;

@@ -130,7 +130,7 @@ the player has won.
 
 -   No entry fee.
 -   No financial reward.
--   Recommended three-minute timer.
+-   Optional client-side timer only; it never gates contract submission.
 -   Local move counter.
 -   One official solution submission per game.
 -   An unsuccessful submission ends that attempt; player can start a new
@@ -873,19 +873,19 @@ and encrypted verification.
 **Exit criteria:** A user can play and complete a Classic round on
 Sepolia without a transaction for each move.
 
-### Phase 4 --- Daily Challenge
+### Phase 4 --- Private-memory Challenge
 
--   Implement daily puzzle creation.
--   Create shared challenge identifiers.
--   Prevent duplicate participation.
--   Design a competitive clue/reveal system; do not reuse Classic's private
-    target reveal or position hints.
--   Implement public result verification.
--   Build leaderboard and streaks.
--   Add verification grace period.
+-   Create two-player challenge lobbies and a shared encrypted target.
+-   Give only challenge participants decrypt permission for the target.
+-   Prevent duplicate submissions.
+-   Make only each player's encrypted win/loss boolean publicly decryptable.
+-   Verify every public result with the Zama KMS proof before resolution.
+-   Select a winner from original submission timestamps, not callback order.
+-   Add a bounded verification grace period for unavailable callbacks.
 
-**Exit criteria:** Multiple wallets can solve the same daily encrypted
-puzzle and have verifiable results.
+**Exit criteria:** Two wallets can solve the same encrypted puzzle while
+observers cannot read it or copy the solution, and the winner has a
+verifiable public result.
 
 ### Phase 5 --- Duel matchmaking
 
@@ -900,7 +900,7 @@ puzzle and have verifiable results.
 **Exit criteria:** Two players can join and compete against the same
 encrypted target.
 
-### Phase 6 --- ERC-7984 and escrow
+### Phase 6 --- ERC-7984 and escrow (parallel with Challenge hardening)
 
 -   Verify the official Sepolia token and ABI.
 -   Integrate ERC-7984.
@@ -1106,8 +1106,8 @@ AOE. The following is an aggressive schedule beginning November 18.
   Dec 13       Demo and X announcement
   Dec 14       Final submission and contingency
 
-If time becomes tight, prioritize a fully functioning Classic Mode and
-Duel Mode over decorative features or expansion of the token economy.
+ERC-7984 escrow is a required competitive-mode deliverable, not optional
+scope to defer. Decorative features and leaderboard expansion yield first.
 
 ------------------------------------------------------------------------
 

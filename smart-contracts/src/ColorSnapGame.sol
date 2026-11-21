@@ -16,14 +16,12 @@ contract ColorSnapGame is ZamaEthereumConfig {
         NONE,
         ACTIVE,
         SOLUTION_SUBMITTED,
-        CANCELLED,
-        EXPIRED
+        CANCELLED
     }
 
     struct Game {
         address player;
         GameStatus status;
-        uint256 deadline;
         uint256 createdAt;
         bool hasSubmission;
         uint256 submittedAt;
@@ -41,12 +39,9 @@ contract ColorSnapGame is ZamaEthereumConfig {
     mapping(address => uint256[]) private playerGames;
     uint256 public nextGameId = 1;
 
-    uint256 private constant CLASSIC_DEADLINE_SECONDS = 300;
-
-    event GameCreated(uint256 indexed gameId, address indexed player, uint256 deadline);
+    event GameCreated(uint256 indexed gameId, address indexed player);
     event SolutionSubmitted(uint256 indexed gameId, address indexed player, uint256 submittedAt);
     event GameEnded(uint256 indexed gameId, address indexed player);
-    event GameExpired(uint256 indexed gameId, address indexed player);
 
     // ------------------------------------------------------------------
     // Creation — generates the encrypted target permutation
@@ -63,7 +58,6 @@ contract ColorSnapGame is ZamaEthereumConfig {
         Game storage g = games[gameId];
         g.player = msg.sender;
         g.status = GameStatus.ACTIVE;
-        g.deadline = block.timestamp + CLASSIC_DEADLINE_SECONDS;
         g.createdAt = block.timestamp;
 
         PrioritizedId[5] memory items;
@@ -86,7 +80,7 @@ contract ColorSnapGame is ZamaEthereumConfig {
         }
 
         playerGames[msg.sender].push(gameId);
-        emit GameCreated(gameId, msg.sender, g.deadline);
+        emit GameCreated(gameId, msg.sender);
     }
 
     /// @notice Compare-and-swap two (prio, id) pairs so the smaller sorts left.
@@ -114,7 +108,6 @@ contract ColorSnapGame is ZamaEthereumConfig {
         Game storage g = games[gameId];
         require(g.player == msg.sender, "Not your game");
         require(g.status == GameStatus.ACTIVE, "Game not active");
-        require(block.timestamp <= g.deadline, "Game expired");
         require(!g.hasSubmission, "Already submitted");
 
         ebool solved = FHE.asEbool(true);
@@ -160,26 +153,14 @@ contract ColorSnapGame is ZamaEthereumConfig {
         return g.solved;
     }
 
-    /// @notice Forfeits an unfinished game before its deadline.
+    /// @notice Forfeits an unfinished game.
     function endGame(uint256 gameId) external {
         Game storage g = games[gameId];
         require(g.player == msg.sender, "Not your game");
         require(g.status == GameStatus.ACTIVE, "Game not active");
-        require(block.timestamp <= g.deadline, "Game expired");
 
         g.status = GameStatus.CANCELLED;
         emit GameEnded(gameId, msg.sender);
-    }
-
-    /// @notice Marks an active game expired after its deadline. Anyone may
-    ///         call this so stale games have a deterministic terminal state.
-    function expireGame(uint256 gameId) external {
-        Game storage g = games[gameId];
-        require(g.status == GameStatus.ACTIVE, "Game not active");
-        require(block.timestamp > g.deadline, "Game not expired");
-
-        g.status = GameStatus.EXPIRED;
-        emit GameExpired(gameId, g.player);
     }
 
     // ------------------------------------------------------------------
@@ -190,17 +171,10 @@ contract ColorSnapGame is ZamaEthereumConfig {
     function getGame(uint256 gameId)
         external
         view
-        returns (
-            address player,
-            GameStatus status,
-            uint256 deadline,
-            uint256 createdAt,
-            bool hasSubmission,
-            uint256 submittedAt
-        )
+        returns (address player, GameStatus status, uint256 createdAt, bool hasSubmission, uint256 submittedAt)
     {
         Game storage g = games[gameId];
-        return (g.player, g.status, g.deadline, g.createdAt, g.hasSubmission, g.submittedAt);
+        return (g.player, g.status, g.createdAt, g.hasSubmission, g.submittedAt);
     }
 
     function getPlayerGames(address player) external view returns (uint256[] memory) {
