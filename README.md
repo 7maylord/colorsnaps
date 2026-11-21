@@ -55,6 +55,20 @@
 
 ## 📖 Overview
 
+## Confidential gaming deployment (Ethereum Sepolia)
+
+ColorSnap's confidential game stack is live on Zama FHEVM for Ethereum Sepolia (`11155111`). The Classic game keeps both the target pattern and solved result encrypted; the challenge and duel contracts support private multiplayer play, with a public-mint ERC-7984 test cUSD token for testing stakes.
+
+| Contract | Address | Verification |
+| --- | --- | --- |
+| ColorSnapGame | [`0x24147D3cc6B12Ec9BA369F3eA4429849bEe301E9`](https://sepolia.etherscan.io/address/0x24147D3cc6B12Ec9BA369F3eA4429849bEe301E9) | Verified |
+| ColorSnapChallenge | [`0xC2039aC0aEd807B89e46A1F87704A9827De58227`](https://sepolia.etherscan.io/address/0xC2039aC0aEd807B89e46A1F87704A9827De58227) | Verified |
+| ColorSnap Test USD (ERC-7984) | [`0x4A4ABFc95544b0199c19354Dd4Cbb47047eC925E`](https://sepolia.etherscan.io/address/0x4A4ABFc95544b0199c19354Dd4Cbb47047eC925E) | Verified |
+| ColorSnapDuelEscrow | [`0xf634e0339F1a9A74C952D31bE5e3E021cA345e89`](https://sepolia.etherscan.io/address/0xf634e0339F1a9A74C952D31bE5e3E021cA345e89) | Verified |
+| ColorSnapDuel | [`0x4Bf590486e09c145ccf5F581E8197be275107de3`](https://sepolia.etherscan.io/address/0x4Bf590486e09c145ccf5F581E8197be275107de3) | Verified |
+
+Frontend contract configuration lives in `frontend/src/contracts`. Run `bash scripts/export-frontend-abis.sh` after a contract build or redeployment to refresh all frontend ABI artifacts.
+
 ColorSnap is a revolutionary **decentralized puzzle game** where players match colored bottles to target configurations on the blockchain. Connect your wallet, compete globally, and earn points in this engaging multi-chain experience.
 
 <!-- Interactive Game Preview -->

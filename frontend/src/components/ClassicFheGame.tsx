@@ -3,9 +3,8 @@
 import { decodeEventLog, type Address, type Hex } from "viem";
 import { useAccount, useChainId, usePublicClient, useWalletClient, useWriteContract } from "wagmi";
 import { useEffect, useState } from "react";
-import { colorSnapFheAbi } from "@/abi/color_snap_fhe";
+import { colorSnapGameAbi, SEPOLIA_CONTRACTS } from "@/contracts";
 import { CHAIN_IDS } from "@/config/chains";
-import { CONTRACT_ADDRESSES } from "@/config";
 import { decryptClassicBoolean, decryptClassicValues, encryptClassicSolution } from "@/lib/zama/classic-fhe";
 import Bottle from "./Bottle";
 
@@ -24,7 +23,7 @@ export default function ClassicFheGame() {
   const publicClient = usePublicClient({ chainId: CHAIN_IDS.ETHEREUM_SEPOLIA });
   const { data: walletClient } = useWalletClient({ chainId: CHAIN_IDS.ETHEREUM_SEPOLIA });
   const { writeContractAsync } = useWriteContract();
-  const contractAddress = asAddress(CONTRACT_ADDRESSES.ZAMA_SEPOLIA);
+  const contractAddress = asAddress(SEPOLIA_CONTRACTS.game);
   const [gameId, setGameId] = useState<bigint>();
   const [target, setTarget] = useState<number[]>([]);
   const [bottles, setBottles] = useState([0, 1, 2, 3, 4]);
@@ -67,12 +66,12 @@ export default function ClassicFheGame() {
     try {
       setStatus("creating");
       setMessage("Creating an encrypted puzzle on Sepolia…");
-      const hash = await writeContractAsync({ address: contractAddress, abi: colorSnapFheAbi, functionName: "createClassicGame" });
+      const hash = await writeContractAsync({ address: contractAddress, abi: colorSnapGameAbi, functionName: "createClassicGame" });
       const receipt = await publicClient.waitForTransactionReceipt({ hash });
       const event = receipt.logs
         .map((log) => {
           try {
-            return decodeEventLog({ abi: colorSnapFheAbi, data: log.data, topics: log.topics });
+            return decodeEventLog({ abi: colorSnapGameAbi, data: log.data, topics: log.topics });
           } catch {
             return undefined;
           }
@@ -84,7 +83,7 @@ export default function ClassicFheGame() {
       setGameId(id);
       const ciphertexts = await publicClient.readContract({
         address: contractAddress,
-        abi: colorSnapFheAbi,
+        abi: colorSnapGameAbi,
         functionName: "getPuzzleCiphertexts",
         args: [id],
         account: address,
@@ -115,7 +114,7 @@ export default function ClassicFheGame() {
       const encrypted = await encryptClassicSolution({ publicClient, contractAddress, playerAddress: address, bottleIds: bottles });
       const hash = await writeContractAsync({
         address: contractAddress,
-        abi: colorSnapFheAbi,
+        abi: colorSnapGameAbi,
         functionName: "submitSolution",
         args: [gameId, encrypted.handles, encrypted.inputProof],
       });
@@ -124,7 +123,7 @@ export default function ClassicFheGame() {
       setMessage("Privately decrypting your result…");
       const result = await publicClient.readContract({
         address: contractAddress,
-        abi: colorSnapFheAbi,
+        abi: colorSnapGameAbi,
         functionName: "getSolutionResult",
         args: [gameId],
         account: address,
