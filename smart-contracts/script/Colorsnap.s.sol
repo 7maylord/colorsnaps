@@ -97,15 +97,17 @@ contract ColorSnapScript is Script {
         view
         returns (string[] memory inputs)
     {
-        inputs = new string[](8);
+        inputs = new string[](10);
         inputs[0] = "forge";
         inputs[1] = "verify-contract";
         inputs[2] = vm.toString(address(game));
         inputs[3] = "src/ColorSnapGame.sol:ColorSnapGame";
-        inputs[4] = "--chain-id";
-        inputs[5] = chainId;
-        inputs[6] = "--etherscan-api-key";
-        inputs[7] = apiKey;
+        inputs[4] = "--verifier";
+        inputs[5] = "etherscan";
+        inputs[6] = "--chain";
+        inputs[7] = chainId;
+        inputs[8] = "--etherscan-api-key";
+        inputs[9] = apiKey;
     }
 
     function logVerificationCommand() internal view {
@@ -118,7 +120,7 @@ contract ColorSnapScript is Script {
         console.log("");
         console.log("Manual verification command:");
         console.log(
-            "forge verify-contract [CONTRACT_ADDRESS] src/ColorSnapGame.sol:ColorSnapGame --chain-id 11155111 --etherscan-api-key [API_KEY]"
+            "forge verify-contract [CONTRACT_ADDRESS] src/ColorSnapGame.sol:ColorSnapGame --verifier etherscan --chain 11155111 --etherscan-api-key [API_KEY]"
         );
         console.log("===================================");
     }

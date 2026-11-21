@@ -36,15 +36,17 @@ contract ColorSnapScriptTest is Test {
 
         string[] memory inputs = script.buildVerificationInputs("11155111", "dummy-key");
 
-        assertEq(inputs.length, 8);
+        assertEq(inputs.length, 10);
         assertEq(inputs[0], "forge");
         assertEq(inputs[1], "verify-contract");
         assertEq(inputs[2], vm.toString(address(script.game())));
         assertEq(inputs[3], "src/ColorSnapGame.sol:ColorSnapGame");
-        assertEq(inputs[4], "--chain-id");
-        assertEq(inputs[5], "11155111");
-        assertEq(inputs[6], "--etherscan-api-key");
-        assertEq(inputs[7], "dummy-key");
+        assertEq(inputs[4], "--verifier");
+        assertEq(inputs[5], "etherscan");
+        assertEq(inputs[6], "--chain");
+        assertEq(inputs[7], "11155111");
+        assertEq(inputs[8], "--etherscan-api-key");
+        assertEq(inputs[9], "dummy-key");
     }
 
     function test_runHandlesVerificationConfiguration() public {
