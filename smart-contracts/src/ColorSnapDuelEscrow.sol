@@ -30,7 +30,8 @@ contract ColorSnapDuelEscrow is ZamaEthereumConfig, IERC7984Receiver {
     }
 
     IERC7984 public immutable token;
-    address public immutable referee;
+    address public immutable owner;
+    address public referee;
     uint64 public immutable stake;
     uint256 public nextDuelId = 1;
     mapping(uint256 => Duel) private duels;
@@ -40,11 +41,17 @@ contract ColorSnapDuelEscrow is ZamaEthereumConfig, IERC7984Receiver {
     event DepositFinalized(uint256 indexed duelId, address indexed player, bool accepted);
     event DuelSettled(uint256 indexed duelId, address indexed winner);
 
-    constructor(IERC7984 token_, address referee_, uint64 stake_) {
-        require(address(token_) != address(0) && referee_ != address(0) && stake_ != 0, "Invalid configuration");
+    constructor(IERC7984 token_, uint64 stake_) {
+        require(address(token_) != address(0) && stake_ != 0, "Invalid configuration");
         token = token_;
-        referee = referee_;
+        owner = msg.sender;
         stake = stake_;
+    }
+
+    function setReferee(address referee_) external {
+        require(msg.sender == owner, "Only owner");
+        require(referee == address(0) && referee_ != address(0), "Referee configured");
+        referee = referee_;
     }
 
     function createDuel(address opponent) external returns (uint256 duelId) {
@@ -113,7 +120,7 @@ contract ColorSnapDuelEscrow is ZamaEthereumConfig, IERC7984Receiver {
     }
 
     function settleDuel(uint256 duelId, address winner) external {
-        require(msg.sender == referee, "Only referee");
+        require(msg.sender == referee && referee != address(0), "Only referee");
         Duel storage d = duels[duelId];
         require(d.status == Status.FUNDED, "Duel not funded");
         require(winner == d.playerA || winner == d.playerB || winner == address(0), "Invalid winner");

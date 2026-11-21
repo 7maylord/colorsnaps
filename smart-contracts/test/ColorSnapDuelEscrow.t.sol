@@ -20,7 +20,8 @@ contract ColorSnapDuelEscrowTest is FhevmTest {
         bob = makeAccount("bob");
         carol = makeAccount("carol");
         token = new ERC7984Mock("Color USD", "cUSD", "");
-        escrow = new ColorSnapDuelEscrow(token, address(this), STAKE);
+        escrow = new ColorSnapDuelEscrow(token, STAKE);
+        escrow.setReferee(address(this));
         token.$_mint(alice.addr, 500);
         token.$_mint(bob.addr, 500);
     }
