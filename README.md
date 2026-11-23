@@ -15,11 +15,12 @@ Chain ID: `11155111`
 
 | Contract | Address | Explorer |
 | --- | --- | --- |
-| ColorSnapGame | `0x24147D3cc6B12Ec9BA369F3eA4429849bEe301E9` | [Verified](https://sepolia.etherscan.io/address/0x24147D3cc6B12Ec9BA369F3eA4429849bEe301E9) |
-| ColorSnapChallenge | `0xC2039aC0aEd807B89e46A1F87704A9827De58227` | [Verified](https://sepolia.etherscan.io/address/0xC2039aC0aEd807B89e46A1F87704A9827De58227) |
-| ColorSnap Test USD (ERC-7984) | `0x4A4ABFc95544b0199c19354Dd4Cbb47047eC925E` | [Verified](https://sepolia.etherscan.io/address/0x4A4ABFc95544b0199c19354Dd4Cbb47047eC925E) |
-| ColorSnapDuelEscrow | `0xf634e0339F1a9A74C952D31bE5e3E021cA345e89` | [Verified](https://sepolia.etherscan.io/address/0xf634e0339F1a9A74C952D31bE5e3E021cA345e89) |
-| ColorSnapDuel | `0x4Bf590486e09c145ccf5F581E8197be275107de3` | [Verified](https://sepolia.etherscan.io/address/0x4Bf590486e09c145ccf5F581E8197be275107de3) |
+| ColorSnapGame | `0x09f73868172Fca7c85EfB5b51647f07b21709Ddd` | [Verified](https://sepolia.etherscan.io/address/0x09f73868172Fca7c85EfB5b51647f07b21709Ddd) |
+| ColorSnapChallenge | `0x15B206013E0A45313Ef3ab58574E54Aa71eC4A20` | [Verified](https://sepolia.etherscan.io/address/0x15B206013E0A45313Ef3ab58574E54Aa71eC4A20) |
+| ColorSnapDaily | `0xA8486339E1E8622aE7C6466f4DB45b97150550d8` | [Verified](https://sepolia.etherscan.io/address/0xA8486339E1E8622aE7C6466f4DB45b97150550d8) |
+| ColorSnap Test USD (ERC-7984) | `0x62b38bd2B065029D1d45d55Ef78123a7e3C5b224` | [Verified](https://sepolia.etherscan.io/address/0x62b38bd2B065029D1d45d55Ef78123a7e3C5b224) |
+| ColorSnapDuelEscrow | `0xA7860b957e7c75F6CeF2cdDa9ACdBcBce60A8338` | [Verified](https://sepolia.etherscan.io/address/0xA7860b957e7c75F6CeF2cdDa9ACdBcBce60A8338) |
+| ColorSnapDuel | `0x220b324D83450Da7C0F69ff949403B2FC7B27762` | [Verified](https://sepolia.etherscan.io/address/0x220b324D83450Da7C0F69ff949403B2FC7B27762) |
 
 The test cUSD token is intentionally public-mint for Sepolia testing only. It has no value and must not be used as a production asset.
 
