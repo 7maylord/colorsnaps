@@ -4,6 +4,7 @@ pragma solidity ^0.8.27;
 import {Script, console} from "forge-std/Script.sol";
 import {ColorSnapGame} from "../src/ColorSnapGame.sol";
 import {ColorSnapChallenge} from "../src/ColorSnapChallenge.sol";
+import {ColorSnapDaily} from "../src/ColorSnapDaily.sol";
 import {ColorSnapDuelEscrow} from "../src/ColorSnapDuelEscrow.sol";
 import {ColorSnapDuel} from "../src/ColorSnapDuel.sol";
 import {ERC7984Mock} from "@openzeppelin/confidential-contracts/mocks/token/ERC7984Mock.sol";
@@ -12,6 +13,7 @@ import {ERC7984Mock} from "@openzeppelin/confidential-contracts/mocks/token/ERC7
 contract ColorSnapScript is Script {
     ColorSnapGame public game;
     ColorSnapChallenge public challenge;
+    ColorSnapDaily public daily;
     ERC7984Mock public testToken;
     ColorSnapDuelEscrow public duelEscrow;
     ColorSnapDuel public duel;
@@ -39,6 +41,7 @@ contract ColorSnapScript is Script {
 
         game = new ColorSnapGame();
         challenge = new ColorSnapChallenge();
+        daily = new ColorSnapDaily();
         // ERC7984Mock deliberately leaves $_mint(address,uint64) public.
         // It is a Sepolia-only test cUSD so players can obtain funds without
         // an admin faucet or private-key dependency.
@@ -49,6 +52,7 @@ contract ColorSnapScript is Script {
 
         console.log("SUCCESS: ColorSnapGame deployed to:", address(game));
         console.log("SUCCESS: ColorSnapChallenge deployed to:", address(challenge));
+        console.log("SUCCESS: ColorSnapDaily deployed to:", address(daily));
         console.log("SUCCESS: public-mint ERC-7984 test cUSD deployed to:", address(testToken));
         console.log("SUCCESS: ColorSnapDuelEscrow deployed to:", address(duelEscrow));
         console.log("SUCCESS: ColorSnapDuel referee deployed to:", address(duel));

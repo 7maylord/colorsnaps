@@ -56,6 +56,7 @@ contract ColorSnapScriptTest is Test {
         skipped.run();
         assertTrue(address(skipped.game()) != address(0));
         assertTrue(address(skipped.challenge()) != address(0));
+        assertTrue(address(skipped.daily()) != address(0));
         assertTrue(address(skipped.testToken()) != address(0));
         assertTrue(address(skipped.duelEscrow()) != address(0));
         assertTrue(address(skipped.duel()) != address(0));
