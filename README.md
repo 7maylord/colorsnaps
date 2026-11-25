@@ -59,9 +59,9 @@ The high multiplier is a transaction gas ceiling, not a prepaid allocation: the 
 
 ```bash
 cd frontend
-yarn install
+pnpm install --frozen-lockfile
 cp .env.example .env.local
-yarn build
+pnpm build
 ```
 
 Set `NEXT_PUBLIC_PROJECT_ID` in `.env.local`. The verified Sepolia addresses are provided in `.env.example` and can be overridden only for a deliberate redeployment.
