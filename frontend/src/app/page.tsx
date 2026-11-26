@@ -19,7 +19,7 @@ export default function Home() {
         <h1>Remember<br /><em>the light.</em><br />Reveal your<br />instinct.</h1>
         <p>A five-piece memory game where the pattern stays yours. Pick a mode, hold the colors in your mind, and let confidential computation settle the score.</p>
         <div className="entry-actions"><WalletConnectButton method="wallet" /><WalletConnectButton method="email" /></div>
-        <div className="entry-foot">A wallet or email gives you a Sepolia account. No profile to set up.</div>
+        <div className="entry-foot">A wallet or email gives you a Sepolia account. Pick a public callsign after sign-in if you want to appear by name on the Daily board.</div>
       </section>
       <div className="prism-stage" aria-label="Five glass colors"><div className="stage-ring ring-one" /><div className="stage-ring ring-two" /><GlassPieces /></div>
     </div>

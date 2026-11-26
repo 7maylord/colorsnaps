@@ -17,6 +17,7 @@ import {
   colorSnapGameAbi,
   colorSnapChallengeAbi,
   colorSnapDailyAbi,
+  colorSnapPlayerRegistryAbi,
   colorSnapDuelAbi,
   colorSnapDuelEscrowAbi,
   colorSnapTestTokenAbi,

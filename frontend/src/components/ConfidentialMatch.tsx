@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { decodeEventLog, type Address, type Hex } from "viem";
 import { useAccount, usePublicClient, useWalletClient, useWriteContract } from "wagmi";
-import { colorSnapChallengeArtifactAbi, colorSnapDailyAbi, SEPOLIA_CHAIN_ID, SEPOLIA_CONTRACTS } from "@/contracts";
+import { colorSnapChallengeArtifactAbi, colorSnapDailyAbi, colorSnapPlayerRegistryAbi, SEPOLIA_CHAIN_ID, SEPOLIA_CONTRACTS } from "@/contracts";
 import { decryptClassicValues, decryptPublicBooleanWithProof, encryptClassicSolution } from "@/lib/zama/classic-fhe";
 import { ColorBoard, PlayFrame } from "./PlayFrame";
 
@@ -32,6 +32,7 @@ export default function ConfidentialMatch({ mode }: { mode: MatchMode }) {
   const [challenge, setChallenge] = useState<Challenge>();
   const [dailyResult, setDailyResult] = useState<DailyResult>();
   const [ranks, setRanks] = useState<Rank[]>([]);
+  const [rankNames, setRankNames] = useState<Record<string, string>>({});
   const [pieces, setPieces] = useState<number[]>(INITIAL);
   const [target, setTarget] = useState<number[]>([]);
   const [selected, setSelected] = useState<number>();
@@ -46,6 +47,11 @@ export default function ConfidentialMatch({ mode }: { mode: MatchMode }) {
         publicClient.readContract({ address: contractAddress, abi, functionName: "getLeaderboard", args: [matchId, BigInt(0), BigInt(20)] }) as Promise<Rank[]>,
       ]);
       setDailyResult(result); setRanks(leaderboard);
+      const names = await Promise.all(leaderboard.map(async rank => {
+        try { return await publicClient.readContract({ address: SEPOLIA_CONTRACTS.playerRegistry, abi: colorSnapPlayerRegistryAbi, functionName: "names", args: [rank.player] }) as string; }
+        catch { return ""; }
+      }));
+      setRankNames(Object.fromEntries(leaderboard.map((rank, index) => [rank.player.toLowerCase(), names[index]])));
       if (result[2]) { setPhase("resolved"); setMessage(result[3] ? "Verified. Your mark is on today's board." : "Verified. Tomorrow brings a new pattern."); }
       else if (result[1]) { setPhase("submitted"); setMessage("Your answer is on chain. Verify the public result to enter the ranking."); }
       else if (result[0]) { setPhase("waiting"); setMessage("You're in. Reveal today's private pattern when ready."); }
@@ -174,7 +180,7 @@ export default function ConfidentialMatch({ mode }: { mode: MatchMode }) {
         {phase === "submitted" && <button disabled={busy} className="primary-action control-action" onClick={finalize}>Verify result →</button>}
         {!isDaily && id && challenge?.[2] === 2 && <div className="sub-actions"><button disabled={busy} onClick={resolve}>Resolve if ready</button><button onClick={() => refresh(id)}>Refresh</button></div>}
         {phase === "error" && id && <button className="text-action" onClick={() => refresh(id)}>Refresh state</button>}
-        {isDaily && ranks.length > 0 && <ol className="rank-list">{ranks.map((rank,index) => <li key={rank.player}><span>{index + 1}. {rank.player.slice(0,6)}…{rank.player.slice(-4)}</span><span>{new Date(Number(rank.submittedAt)*1000).toLocaleTimeString("en-GB",{ timeZone:"UTC" })} UTC</span></li>)}</ol>}
+        {isDaily && ranks.length > 0 && <ol className="rank-list">{ranks.map((rank,index) => <li key={rank.player}><span>{index + 1}. {rankNames[rank.player.toLowerCase()] || `${rank.player.slice(0,6)}…${rank.player.slice(-4)}`}</span><span>{new Date(Number(rank.submittedAt)*1000).toLocaleTimeString("en-GB",{ timeZone:"UTC" })} UTC</span></li>)}</ol>}
       </div><div className="status-line">{isDaily ? "One verified result per UTC day" : challenge?.[2] === 2 ? `Deadline: ${new Date(Number(challenge[3])*1000).toLocaleTimeString()} · Creator ${challenge[6] ? "submitted" : "waiting"} · Friend ${challenge[7] ? "submitted" : "waiting"}` : "A challenge begins when the second player joins"}</div></div>
     </section>
   </PlayFrame>;

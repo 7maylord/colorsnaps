@@ -26,7 +26,7 @@ export default function ModesPage() {
   return <main className="scene modes-scene"><PointerLight /><div className="noise" aria-hidden="true" />
     <header className="site-head"><Link href="/" className="brand">COLOR<span>SNAP</span><i>✳</i></Link><WalletConnectButton /></header>
     <div className="modes-intro"><div><span className="tiny-label"><span className="live-dot" /> THE ARCADE IS OPEN</span><h1>Choose your<br /><em>next adventure.</em></h1></div><p>Five colors. Four ways to play. Your secret stays yours.</p></div>
-    <PlayerIdentity />
+    <PlayerIdentity /><Link className="leaderboard-shortcut" href="/leaderboard">★ See today&apos;s player board <span>↗</span></Link>
     <div className="mode-grid">{modes.map((mode) => <Link key={mode.slug} href={`/${mode.slug === "classic" ? "game" : mode.slug}${mode.slug === "challenge" && invite ? `?invite=${encodeURIComponent(invite)}` : mode.slug === "duel" && duel ? `?duel=${encodeURIComponent(duel)}` : ""}`} className={`mode-card mode-${mode.slug}`} onPointerMove={event => { if (event.pointerType === "mouse") { const rect = event.currentTarget.getBoundingClientRect(); event.currentTarget.style.setProperty("--card-x", `${event.clientX - rect.left}px`); event.currentTarget.style.setProperty("--card-y", `${event.clientY - rect.top}px`); } }}>
       <div className="mode-top"><span>{mode.number} / {mode.kicker}</span><span className="mode-arrow">↗</span></div>
       <div className="mode-mark" aria-hidden="true">{mode.slug === "classic" ? <GlassPieces compact /> : mode.mark}</div>

@@ -27,7 +27,7 @@ export function PlayFrame({ mode, number, description, children }: { mode: "Clas
   useEffect(() => { if (status === "disconnected") router.replace("/" + window.location.search); }, [status, router]);
   return <main className="scene play-scene"><PointerLight /><div className="noise" aria-hidden="true" />
     <header className="site-head"><Link href="/modes" className="brand">COLOR<span>SNAP</span><i>✳</i></Link><div className="header-player">{profile.name && <span className="player-badge">★ {profile.name}</span>}<WalletConnectButton /></div></header>
-    <nav className="play-nav"><Link href="/modes">← ALL MODES</Link><HowToPlay mode={mode} /><span>{number} / 04</span></nav>
+    <nav className="play-nav"><Link href="/modes">← ALL MODES</Link>{mode === "Daily" && <Link href="/leaderboard">★ TODAY&apos;S BOARD</Link>}<HowToPlay mode={mode} /><span>{number} / 04</span></nav>
     <div className="play-heading"><div><span className="tiny-label"><span className="live-dot" /> CONFIDENTIAL / {mode.toUpperCase()}</span><h1 className="play-title"><em>{mode}</em> room.</h1></div><p>{description}</p></div>
     {status === "reconnecting" ? <div className="game-notice">Restoring your session…</div> : !isConnected ? <div className="game-notice">Sign in to play. <Link href={typeof window !== "undefined" ? "/" + window.location.search : "/"}>Go to entrance →</Link></div> : chainId !== CHAIN_IDS.ETHEREUM_SEPOLIA ? <div className="game-notice">This room plays on Ethereum Sepolia. <button className="text-action" onClick={() => switchChain({ chainId: CHAIN_IDS.ETHEREUM_SEPOLIA })}>Switch network</button></div> : children}
     <footer className="site-foot"><span>PRIVATE PATTERN · PUBLIC PROOF</span><span>BUILT WITH ZAMA FHE</span></footer>
