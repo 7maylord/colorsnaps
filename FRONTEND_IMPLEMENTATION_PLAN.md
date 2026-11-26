@@ -1,0 +1,31 @@
+# ColorSnap frontend rewrite
+
+## The first minute
+
+Open ColorSnap, choose **Continue with wallet** or **Continue with email**, and land directly at **Choose a mode**. Each mode shows who plays, what becomes public and whether it costs test tokens. Choosing Classic opens a board with one action, **Create puzzle**. Players should reach that action without scrolling, naming a profile or learning what a ciphertext is.
+
+## Art direction and interaction
+
+Build the experience around a stained-glass workbench. Five glass pieces cast colored light across a warm paper surface. Give each color a permanent engraved symbol and an accessible name. Use the existing Geist fonts, large editorial labels and crisp dark outlines. Prototype the actual playable pieces first so the visual treatment earns its place during play.
+
+| Scene | Signature interaction | Player control |
+| --- | --- | --- |
+| Entrance | A nearby pointer bends a beam through a prism. On sign-in the beam splits into four paths. | Both login buttons work immediately. Keyboard focus or a tap lights the prism. |
+| Mode room | Four labeled instruments occupy one tabletop. Focus Classic to illuminate five loose pieces, Daily to stamp today's UTC date, Challenge to link two racks, or Duel to tip a balance. | Select any instrument directly. On mobile place them in a thumb-reachable two-by-two layout. Show the incoming invite on its instrument. |
+| Classic | Glass shutters open for the five-second private reveal. During play, selecting a piece lights its socket and a second selection swaps the pair. | Click, tap or use the keyboard. Show **Submit arrangement** throughout play. Classic has no solve timer. |
+| Daily | A dated pane gains a permanent mark when a result is verified. The same surface unfolds to show that day's rankings. | Join today's shared puzzle, play once and revisit the result after UTC rollover. |
+| Challenge | Two parallel racks show each player's public progress. The opponent's rack shows participation and verification state. | Create or join by invite. Show the contract deadline after the second player joins. |
+| Duel | A two-pan balance shows each deposit moving from pending to accepted. At settlement the visual follows the escrow outcome. | Name the opponent, review the fixed stake, mint test cUSD if needed, deposit, play and inspect payout or draw. |
+
+Keep the native cursor. Drive highlights from pointer position using a single animation frame loop on the active surface. Disable tracking on coarse pointers. Reduced motion uses immediate state changes and a readable reveal timer. Keep focus visible, support Enter/Space to swap, announce transaction stages through a live region and never depend on color or motion to communicate a result.
+
+## Implementation checklist
+
+- [ ] **1. Make login reliable.** Start in `frontend/src/config` and `frontend/src/context/index.tsx`. Keep Reown/Wagmi for the first slice. Validate the effective public project ID including placeholder values, align wallet metadata with the browser origin and configure allowed origins for local development (including port 3002), preview and production. Enable email login on the chosen project. Exercise both an injected wallet and an email-backed signer through a Sepolia write and a scoped Zama decryption signature. Show an actionable setup message when configuration is missing. Disable optional analytics during development. Reproduce the logged authorization rejection in a clean browser profile to distinguish extension behavior from application errors.
+- [ ] **2. Build the shell and mode room.** Introduce `/modes` and mode-specific play routes. Redirect the existing `/game` entry to the chooser, wait for session restoration before routing, and return signed-out visitors to login. Preserve pending invitations through login. Surface account, network and disconnect in one compact control. Use Ethereum Sepolia for gameplay. Reconcile all six addresses in the registry with the deployed addresses in `frontend/.env.example`, including Daily, and consume the exported ABIs.
+- [ ] **3. Ship Classic as the first complete slice.** Move the FHE calls from the existing Classic screen into a session hook. Reuse the Zama encryption and decryption helpers. Present one primary action per stage. Distinguish wallet approval, transaction confirmation, private reveal, local swaps, encrypted submission and result decryption. Save game ID and pending transaction hash scoped by chain, contract and account. Recover from refresh or rejected signatures without creating a second game. Clear private board state on account change.
+- [ ] **4. Deliver Daily and Challenge.** Reuse the board with separate mode controllers. Read the Daily day ID from the contract, initialize if needed, resume membership and enforce one submission per day. Finalize the public boolean with its KMS proof before ranking. For Challenge, expose invite, join, deadline, both submissions, finalization and resolution. Fetch contract state on reconnect and use confirmed events to refresh it.
+- [ ] **5. Deliver Duel.** Read token, stake and referee from escrow. Show test token units and Sepolia gas requirements before a deposit. Bind encrypted transfer inputs to the token and signer, encode the duel ID, and finalize each deposit with its proof. Enable play when funded. Track submission, proof, settlement and refund outcomes independently. Verify the deployed escrow's available recovery paths before enabling deposits in the UI.
+- [ ] **6. Release against a clean checkout.** Review the currently untracked layout, shared components and config required for a fresh build. Run frozen pnpm install, typecheck and production build. Test mobile touch, keyboard and reduced motion. Run two-wallet Sepolia games, including email login, refresh mid-proof, rejected signatures, UTC rollover and a settled duel. Record transaction hashes and public outcomes. Keep private targets, permits and guesses out of telemetry and recordings intended to demonstrate privacy.
+
+**First acceptance gate:** A new player can sign in by either method, choose Classic, play and recover their result after refresh. A returning player reaches the chooser directly. Test the flow on the actual local origin and a deployed preview before extending the board to multiplayer.
