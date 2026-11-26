@@ -23,6 +23,7 @@ export function useClassicSession() {
   const [selected, setSelected] = useState<number>();
   const [phase, setPhase] = useState<Phase>("idle");
   const [size, setSize] = useState(5);
+  const [nextSize, setNextSize] = useState(5);
   const [completedGames, setCompletedGames] = useState(0);
   const [points, setPoints] = useState(0);
   const [message, setMessage] = useState("Create a puzzle to begin.");
@@ -38,7 +39,7 @@ export function useClassicSession() {
       publicClient.readContract({ address: contractAddress, abi: colorSnapArcadeAbi, functionName: "points", args: [address] }) as Promise<bigint>,
       publicClient.readContract({ address: contractAddress, abi: colorSnapArcadeAbi, functionName: "nextPuzzleSize", args: [address] }) as Promise<number>,
     ]);
-    setCompletedGames(Number(completed)); setPoints(Number(earned)); setSize(Number(nextSize));
+    setCompletedGames(Number(completed)); setPoints(Number(earned)); setNextSize(Number(nextSize));
   }, [address, publicClient, contractAddress]);
   const reveal = useCallback(async (gameId: bigint) => {
     if (!address || !publicClient || !walletClient) throw new Error("Wallet is not ready for private reveal.");
@@ -97,13 +98,17 @@ export function useClassicSession() {
         setId(gameId);
         const game = await publicClient.readContract({ address: contractAddress, abi: colorSnapArcadeAbi, functionName: "getGame", args: [gameId] }) as readonly [Hex, number, number, bigint, boolean, boolean];
         if (game[0].toLowerCase() !== address.toLowerCase()) throw new Error("Saved game belongs to another account.");
-        if (game[2] === 3) { save({ dismissed: true }); return; }
+        if (game[2] === 3) { setId(undefined); save({ dismissed: true }); return; }
         if (cancelled) return;
         if (game[2] === 2) await showResult(gameId); else await reveal(gameId);
       } catch (error) { if (!cancelled) { setPhase("error"); notify("error", errorText(error, "Could not restore the game.")); } }
     })();
     return () => { cancelled = true; };
   }, [key, address, publicClient, contractAddress, save, reveal, showResult, loadStats]);
+
+  useEffect(() => {
+    if (phase === "idle" && id === undefined) setPieces(Array.from({ length: nextSize }, (_, index) => index));
+  }, [phase, id, nextSize]);
 
   useEffect(() => {
     if (phase !== "revealing" || target.length !== size) return;
@@ -162,6 +167,6 @@ export function useClassicSession() {
     } catch (error) { setPhase("error"); notify("error", errorText(error, "Could not recover the game.")); }
   }
 
-  function reset() { save({ dismissed: true }); setId(undefined); setTarget([]); setPieces(Array.from({ length: size }, (_, i) => i)); setSelected(undefined); setPhase("idle"); setMessage("Create a puzzle to begin."); }
-  return { id, target, pieces, selected, size, completedGames, points, phase, message, choose, create, submit, recover, reset };
+  function reset() { save({ dismissed: true }); setId(undefined); setTarget([]); setPieces(Array.from({ length: nextSize }, (_, i) => i)); setSelected(undefined); setPhase("idle"); setMessage("Create a puzzle to begin."); }
+  return { id, target, pieces, selected, size: id ? size : nextSize, completedGames, points, phase, message, choose, create, submit, recover, reset };
 }
