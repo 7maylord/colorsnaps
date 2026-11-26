@@ -29,6 +29,7 @@ export const modal = createAppKit({
   features: {
     analytics: false
   },
+  enableCoinbase: false,
   themeVariables: {
     '--w3m-accent': '#000000',
   }

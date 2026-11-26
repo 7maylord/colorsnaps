@@ -5,10 +5,10 @@ import { decodeEventLog, type Hex } from "viem";
 import { useAccount, usePublicClient, useWalletClient, useWriteContract } from "wagmi";
 import { CHAIN_IDS } from "@/config/chains";
 import { colorSnapGameAbi, SEPOLIA_CONTRACTS, SEPOLIA_CHAIN_ID } from "@/contracts";
-import { decryptClassicBoolean, decryptClassicValues, encryptClassicSolution } from "@/lib/zama/classic-fhe";
+import { decryptClassicBoolean, decryptClassicValues, encryptClassicSolution, prepareFhevmRuntime } from "@/lib/zama/classic-fhe";
 
 type Phase = "idle" | "creating" | "revealing" | "playing" | "submitting" | "decrypting" | "won" | "lost" | "error";
-type Saved = { id?: string; pending?: Hex; pendingType?: "create" | "submit" };
+type Saved = { id?: string; pending?: Hex; pendingType?: "create" | "submit"; dismissed?: boolean };
 const START = [0, 1, 2, 3, 4];
 
 export function useClassicSession() {
@@ -63,10 +63,16 @@ export function useClassicSession() {
           }
           if (gameId) save({ id: gameId.toString() });
         }
+        if (!gameId && !saved.dismissed) {
+          const games = await publicClient.readContract({ address: contractAddress, abi: [{ type: "function", name: "getPlayerGames", stateMutability: "view", inputs: [{ name: "player", type: "address" }], outputs: [{ type: "uint256[]" }] }] as const, functionName: "getPlayerGames", args: [address] });
+          gameId = games.at(-1);
+          if (gameId) save({ id: gameId.toString() });
+        }
         if (cancelled || !gameId) return;
         setId(gameId);
         const game = await publicClient.readContract({ address: contractAddress, abi: [{ type: "function", name: "getGame", stateMutability: "view", inputs: [{ name: "gameId", type: "uint256" }], outputs: [{ name: "player", type: "address" }, { name: "status", type: "uint8" }, { name: "createdAt", type: "uint256" }, { name: "hasSubmission", type: "bool" }, { name: "submittedAt", type: "uint256" }] }] as const, functionName: "getGame", args: [gameId] });
         if (game[0].toLowerCase() !== address.toLowerCase()) throw new Error("Saved game belongs to another account.");
+        if (game[1] === 3) { save({ dismissed: true }); return; }
         if (cancelled) return;
         if (game[3]) await showResult(gameId); else await reveal(gameId);
       } catch (error) { if (!cancelled) { setPhase("error"); setMessage(error instanceof Error ? error.message : "Could not restore the game."); } }
@@ -91,7 +97,9 @@ export function useClassicSession() {
   async function create() {
     if (!address || !publicClient || !walletClient) return;
     try {
-      setPhase("creating"); setMessage("Approve puzzle creation in your wallet.");
+      setPhase("creating"); setMessage("Loading the private game engine…");
+      await prepareFhevmRuntime();
+      setMessage("Approve puzzle creation in your wallet.");
       const hash = await writeContractAsync({ address: contractAddress, abi: colorSnapGameAbi, functionName: "createClassicGame" });
       save({ pending: hash, pendingType: "create" }); setMessage("Waiting for Sepolia confirmation…");
       const receipt = await publicClient.waitForTransactionReceipt({ hash });
@@ -129,6 +137,6 @@ export function useClassicSession() {
     } catch (error) { setPhase("error"); setMessage(error instanceof Error ? error.message : "Could not recover the game."); }
   }
 
-  function reset() { if (key) localStorage.removeItem(key); setId(undefined); setTarget([]); setPieces(START); setSelected(undefined); setPhase("idle"); setMessage("Create a puzzle to begin."); }
+  function reset() { save({ dismissed: true }); setId(undefined); setTarget([]); setPieces(START); setSelected(undefined); setPhase("idle"); setMessage("Create a puzzle to begin."); }
   return { id, target, pieces, selected, phase, message, choose, create, submit, recover, reset };
 }

@@ -26,7 +26,7 @@ export default async function RootLayout({
   const cookies = headersData.get('cookie');
 
   return (
-    <html lang="en">
+    <html lang="en" data-scroll-behavior="smooth">
         <body>
         <ContextProvider cookies={cookies}>
           {children}

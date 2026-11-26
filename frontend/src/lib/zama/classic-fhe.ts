@@ -1,11 +1,22 @@
 "use client";
 
 import { sepolia } from "@fhevm/sdk/chains";
-import { createFhevmClient, initFhevmRuntime } from "@fhevm/sdk/viem";
+import { createFhevmClient, initFhevmRuntime, setFhevmRuntimeConfig } from "@fhevm/sdk/viem";
 import type { Hex, PublicClient, WalletClient } from "viem";
 
 const PUZZLE_SIZE = 5;
 const PERMIT_DURATION_SECONDS = 10 * 60;
+let runtimeReady: Promise<void> | undefined;
+
+export function prepareFhevmRuntime(): Promise<void> {
+  if (typeof window === "undefined") throw new Error("FHE encryption must run in the browser.");
+  setFhevmRuntimeConfig({ wasmAssetLoadMode: "auto" });
+  runtimeReady ??= initFhevmRuntime().catch((error) => {
+    runtimeReady = undefined;
+    throw error;
+  });
+  return runtimeReady;
+}
 
 export type EncryptedClassicSubmission = {
   readonly handles: readonly [Hex, Hex, Hex, Hex, Hex];
@@ -40,7 +51,7 @@ function assertPuzzle(values: readonly number[]): asserts values is readonly [nu
  * user-decryption permit.
  */
 export async function createClassicFheClient(publicClient: PublicClient) {
-  await initFhevmRuntime();
+  await prepareFhevmRuntime();
   // The app's wagmi stack currently pins an older compatible viem minor than
   // the FHEVM SDK's own viem dependency. Both expose the public-client methods
   // required by the SDK; avoid leaking its internal generic version into app
