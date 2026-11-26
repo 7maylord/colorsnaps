@@ -100,4 +100,28 @@ contract ColorSnapDuelEscrowTest is FhevmTest {
         assertEq(uint8(status), uint8(ColorSnapDuelEscrow.Status.AWAITING_CREATOR));
         assertFalse(aFinalized);
     }
+
+    function test_cancelAfterFundingTimeoutReturnsCreatorDeposit() public {
+        uint256 duelId = createDuel();
+        deposit(duelId, alice, STAKE);
+        finalize(duelId, alice.addr);
+        vm.prank(alice.addr);
+        vm.expectRevert("Funding still open");
+        escrow.cancelDuel(duelId);
+        vm.warp(block.timestamp + escrow.FUNDING_TIMEOUT());
+        vm.prank(alice.addr);
+        escrow.cancelDuel(duelId);
+        assertEq(balanceOf(alice), 500);
+        (,, ColorSnapDuelEscrow.Status status,,) = escrow.getDuel(duelId);
+        assertEq(uint8(status), uint8(ColorSnapDuelEscrow.Status.CANCELLED));
+    }
+
+    function test_cancelAfterTimeoutReturnsUnfinalizedDeposit() public {
+        uint256 duelId = createDuel();
+        deposit(duelId, alice, STAKE);
+        vm.warp(block.timestamp + escrow.FUNDING_TIMEOUT());
+        vm.prank(bob.addr);
+        escrow.cancelDuel(duelId);
+        assertEq(balanceOf(alice), 500);
+    }
 }

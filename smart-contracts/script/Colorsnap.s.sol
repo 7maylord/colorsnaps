@@ -24,7 +24,6 @@ contract ColorSnapScript is Script {
     function run() public {
         // Get deployment parameters from environment
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
-        string memory rpcUrl = vm.envString("RPC_URL");
         string memory chainId = vm.envString("CHAIN_ID");
 
         address owner = vm.addr(deployerPrivateKey);
@@ -32,8 +31,20 @@ contract ColorSnapScript is Script {
         console.log("=== SEPOLIA FHEVM DEPLOYMENT CONFIGURATION ===");
         console.log("Owner address:", owner);
         console.log("Chain ID:", chainId);
-        console.log("RPC URL:", rpcUrl);
         console.log("===============================================");
+
+        if (vm.envOr("DUEL_ONLY", false)) {
+            require(block.chainid == 11155111, "Duel upgrade is Sepolia only");
+            testToken = ERC7984Mock(vm.envAddress("EXISTING_TEST_TOKEN_ADDRESS"));
+            vm.startBroadcast(deployerPrivateKey);
+            duelEscrow = new ColorSnapDuelEscrow(testToken, TEST_DUEL_STAKE);
+            duel = new ColorSnapDuel(duelEscrow);
+            duelEscrow.setReferee(address(duel));
+            vm.stopBroadcast();
+            console.log("UPGRADED: ColorSnapDuelEscrow:", address(duelEscrow));
+            console.log("UPGRADED: ColorSnapDuel referee:", address(duel));
+            return;
+        }
 
         console.log("Deploying ColorSnapGame (confidential game engine) to Sepolia...");
 

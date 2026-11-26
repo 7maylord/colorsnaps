@@ -23,6 +23,7 @@ contract ColorSnapDuelEscrow is ZamaEthereumConfig, IERC7984Receiver {
         address playerA;
         address playerB;
         Status status;
+        uint256 createdAt;
         bool[2] depositReceived;
         bool[2] depositFinalized;
         euint64[2] deposits;
@@ -40,6 +41,9 @@ contract ColorSnapDuelEscrow is ZamaEthereumConfig, IERC7984Receiver {
     event DepositReceived(uint256 indexed duelId, address indexed player);
     event DepositFinalized(uint256 indexed duelId, address indexed player, bool accepted);
     event DuelSettled(uint256 indexed duelId, address indexed winner);
+    event DuelCancelled(uint256 indexed duelId);
+
+    uint256 public constant FUNDING_TIMEOUT = 1 hours;
 
     constructor(IERC7984 token_, uint64 stake_) {
         require(address(token_) != address(0) && stake_ != 0, "Invalid configuration");
@@ -61,7 +65,22 @@ contract ColorSnapDuelEscrow is ZamaEthereumConfig, IERC7984Receiver {
         d.playerA = msg.sender;
         d.playerB = opponent;
         d.status = Status.AWAITING_CREATOR;
+        d.createdAt = block.timestamp;
         emit DuelCreated(duelId, msg.sender, opponent);
+    }
+
+    /// @notice Recover deposits if the other player never funds the duel.
+    /// @dev Also returns an unfinalized deposit; it remains in escrow until
+    /// this timeout if a public-decryption proof cannot be obtained.
+    function cancelDuel(uint256 duelId) external {
+        Duel storage d = duels[duelId];
+        require(msg.sender == d.playerA || msg.sender == d.playerB, "Not a duel player");
+        require(d.status == Status.AWAITING_CREATOR || d.status == Status.AWAITING_OPPONENT, "Duel not pending");
+        require(block.timestamp >= d.createdAt + FUNDING_TIMEOUT, "Funding still open");
+        d.status = Status.CANCELLED;
+        if (d.depositReceived[0]) token.confidentialTransfer(d.playerA, d.deposits[0]);
+        if (d.depositReceived[1]) token.confidentialTransfer(d.playerB, d.deposits[1]);
+        emit DuelCancelled(duelId);
     }
 
     /// @dev Call via token.confidentialTransferAndCall(address(this), amount,
