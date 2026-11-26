@@ -13,21 +13,21 @@ const queryClient = new QueryClient()
 // Set up metadata
 const metadata = {
   name: 'ColorSnap Game',
-  description: 'Decentralized color matching game OnChain',
-  url: 'https://colorsnaps.vercel.app/', // origin must match your domain & subdomain
+  description: 'Confidential color memory on Ethereum Sepolia',
+  url: typeof window === 'undefined' ? 'https://colorsnaps.vercel.app' : window.location.origin,
   icons: ['https://res.cloudinary.com/di2zpd8z7/image/upload/v1754051086/20250731_2328_Enhanced_Logo_Design_remix_01k1h9gxxwfb582phn4cc0635f_1_eisbdt.png']
 }
 
 // Create the modal
 export const modal = createAppKit({
   adapters: [wagmiAdapter],
-  projectId: projectId!,
+  projectId: projectId || 'unconfigured',
   networks,
   defaultNetwork: zamaSepolia,
   metadata,
   themeMode: 'light',
   features: {
-    analytics: true // Optional - defaults to your Cloud configuration
+    analytics: false
   },
   themeVariables: {
     '--w3m-accent': '#000000',

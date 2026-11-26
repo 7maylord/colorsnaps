@@ -12,6 +12,22 @@ export type EncryptedClassicSubmission = {
   readonly inputProof: Hex;
 };
 
+export async function encryptStake(parameters: {
+  readonly publicClient: PublicClient;
+  readonly tokenAddress: Hex;
+  readonly playerAddress: Hex;
+  readonly amount: bigint;
+}): Promise<{ readonly handle: Hex; readonly inputProof: Hex }> {
+  const fhevm = await createClassicFheClient(parameters.publicClient);
+  const result = await fhevm.encryptValues({
+    contractAddress: parameters.tokenAddress,
+    userAddress: parameters.playerAddress,
+    values: [{ type: "uint64", value: parameters.amount }],
+  });
+  if (result.encryptedValues.length !== 1) throw new Error("The FHE relayer returned an invalid stake input.");
+  return { handle: result.encryptedValues[0] as Hex, inputProof: result.inputProof as Hex };
+}
+
 function assertPuzzle(values: readonly number[]): asserts values is readonly [number, number, number, number, number] {
   if (values.length !== PUZZLE_SIZE || values.some((value) => !Number.isInteger(value) || value < 0 || value >= PUZZLE_SIZE)) {
     throw new Error("A ColorSnap solution must contain five bottle identifiers from 0 through 4.");

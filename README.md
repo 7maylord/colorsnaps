@@ -19,10 +19,11 @@ Chain ID: `11155111`
 | ColorSnapChallenge | `0x15B206013E0A45313Ef3ab58574E54Aa71eC4A20` | [Verified](https://sepolia.etherscan.io/address/0x15B206013E0A45313Ef3ab58574E54Aa71eC4A20) |
 | ColorSnapDaily | `0xA8486339E1E8622aE7C6466f4DB45b97150550d8` | [Verified](https://sepolia.etherscan.io/address/0xA8486339E1E8622aE7C6466f4DB45b97150550d8) |
 | ColorSnap Test USD (ERC-7984) | `0x62b38bd2B065029D1d45d55Ef78123a7e3C5b224` | [Verified](https://sepolia.etherscan.io/address/0x62b38bd2B065029D1d45d55Ef78123a7e3C5b224) |
-| ColorSnapDuelEscrow | `0xA7860b957e7c75F6CeF2cdDa9ACdBcBce60A8338` | [Verified](https://sepolia.etherscan.io/address/0xA7860b957e7c75F6CeF2cdDa9ACdBcBce60A8338) |
-| ColorSnapDuel | `0x220b324D83450Da7C0F69ff949403B2FC7B27762` | [Verified](https://sepolia.etherscan.io/address/0x220b324D83450Da7C0F69ff949403B2FC7B27762) |
+| ColorSnapDuelEscrow | `0x12b37749d5D19fF6d77F9792F23c0cBAd7576F35` | [Explorer](https://sepolia.etherscan.io/address/0x12b37749d5D19fF6d77F9792F23c0cBAd7576F35) |
+| ColorSnapDuel | `0x0a6B0dE27D7f922E47152EfA098Cb5235CAFE193` | [Explorer](https://sepolia.etherscan.io/address/0x0a6B0dE27D7f922E47152EfA098Cb5235CAFE193) |
 
 The test cUSD token is intentionally public-mint for Sepolia testing only. It has no value and must not be used as a production asset.
+The replacement escrow deployment is [transaction `0xf227…671c`](https://sepolia.etherscan.io/tx/0xf227b08bcb2af2458f9d176bd5ff9df7089875fa20c4f9c0d0fee75a55a1671c); the referee deployment is [transaction `0x2ab6…a2f`](https://sepolia.etherscan.io/tx/0x2ab60d6aaa883c6951fcd507098248ace76e087fc6615deed4e09d5f82f1da2f).
 
 ## Repository layout
 
@@ -39,7 +40,7 @@ cd smart-contracts
 forge test --offline --disable-labels
 ```
 
-The deployment script deploys the full stack—Classic game, Challenge, test cUSD, Duel Escrow, Duel referee—and wires the escrow referee in the same broadcast.
+The deployment script deploys the full stack—Classic, Challenge, Daily, test cUSD, Duel Escrow, and Duel referee—and wires the escrow referee in the same broadcast. Duel escrow has a one-hour funding timeout that returns pending deposits if the other player does not fund.
 
 ```bash
 set -a
@@ -55,6 +56,13 @@ forge script script/Colorsnap.s.sol:ColorSnapScript \
 
 The high multiplier is a transaction gas ceiling, not a prepaid allocation: the chain charges only gas actually used. `--ffi` enables the script's optional Etherscan verification command.
 
+To replace only the escrow and referee while reusing the deployed test token:
+
+```bash
+DUEL_ONLY=true EXISTING_TEST_TOKEN_ADDRESS=0x62b38bd2B065029D1d45d55Ef78123a7e3C5b224 \
+  forge script script/Colorsnap.s.sol:ColorSnapScript --rpc-url "$RPC_URL" --broadcast --slow --gas-estimate-multiplier 1000
+```
+
 ## Frontend
 
 ```bash
@@ -64,7 +72,8 @@ cp .env.example .env.local
 pnpm build
 ```
 
-Set `NEXT_PUBLIC_PROJECT_ID` in `.env.local`. The verified Sepolia addresses are provided in `.env.example` and can be overridden only for a deliberate redeployment.
+Set `NEXT_PUBLIC_PROJECT_ID` in `.env.local`. The Sepolia addresses are provided in `.env.example` and can be overridden for a deliberate redeployment.
+Enable email login and allow the exact local, preview, and production origins in the Reown project settings. The app uses the current browser origin in wallet metadata and disables optional analytics.
 
 All frontend contract integration is centralized in `frontend/src/contracts`:
 
@@ -86,6 +95,8 @@ bash scripts/export-frontend-abis.sh
 4. Arrange the colors and encrypt the submission in the browser with `@fhevm/sdk`.
 5. The contract evaluates the encrypted solution and returns an encrypted boolean result.
 6. For challenges and duels, the public result is finalized only with a KMS decryption proof.
+
+The frontend starts at the entrance, routes signed-in players to `/modes`, and offers Classic, Daily, Challenge, and Duel rooms. Challenge and Duel invitations preserve their IDs through sign-in. Duel deposits use encrypted ERC-7984 transfers and remain disabled if the selected escrow does not expose timeout recovery.
 
 ## Development notes
 
