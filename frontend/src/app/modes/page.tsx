@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useAccount } from "wagmi";
 import WalletConnectButton from "@/components/WalletConnectButton";
 import { GlassPieces, PointerLight } from "@/components/Visuals";
+import PlayerIdentity from "@/components/PlayerIdentity";
 
 const modes = [
   { number: "01", slug: "classic", title: "Classic", kicker: "SOLO · NO CLOCK", description: "A private pattern, five seconds to remember, all the time you need to arrange.", mark: "✳", note: "Play alone · Free" },
@@ -24,8 +25,9 @@ export default function ModesPage() {
   if (!isConnected) return <main className="scene waiting">Restoring your account…</main>;
   return <main className="scene modes-scene"><PointerLight /><div className="noise" aria-hidden="true" />
     <header className="site-head"><Link href="/" className="brand">COLOR<span>SNAP</span><i>✳</i></Link><WalletConnectButton /></header>
-    <div className="modes-intro"><div><span className="tiny-label"><span className="live-dot" /> THE WORKBENCH IS OPEN</span><h1>Choose your<br /><em>kind of thrill.</em></h1></div><p>Every mode begins with five colors. What happens around them is up to you.</p></div>
-    <div className="mode-grid">{modes.map((mode) => <Link key={mode.slug} href={`/${mode.slug === "classic" ? "game" : mode.slug}${mode.slug === "challenge" && invite ? `?invite=${encodeURIComponent(invite)}` : mode.slug === "duel" && duel ? `?duel=${encodeURIComponent(duel)}` : ""}`} className={`mode-card mode-${mode.slug}`}>
+    <div className="modes-intro"><div><span className="tiny-label"><span className="live-dot" /> THE ARCADE IS OPEN</span><h1>Choose your<br /><em>next adventure.</em></h1></div><p>Five colors. Four ways to play. Your secret stays yours.</p></div>
+    <PlayerIdentity />
+    <div className="mode-grid">{modes.map((mode) => <Link key={mode.slug} href={`/${mode.slug === "classic" ? "game" : mode.slug}${mode.slug === "challenge" && invite ? `?invite=${encodeURIComponent(invite)}` : mode.slug === "duel" && duel ? `?duel=${encodeURIComponent(duel)}` : ""}`} className={`mode-card mode-${mode.slug}`} onPointerMove={event => { if (event.pointerType === "mouse") { const rect = event.currentTarget.getBoundingClientRect(); event.currentTarget.style.setProperty("--card-x", `${event.clientX - rect.left}px`); event.currentTarget.style.setProperty("--card-y", `${event.clientY - rect.top}px`); } }}>
       <div className="mode-top"><span>{mode.number} / {mode.kicker}</span><span className="mode-arrow">↗</span></div>
       <div className="mode-mark" aria-hidden="true">{mode.slug === "classic" ? <GlassPieces compact /> : mode.mark}</div>
       <div><h2>{mode.title}</h2><p>{mode.description}</p></div><div className="mode-bottom">{mode.note}<span>ENTER MODE →</span></div>

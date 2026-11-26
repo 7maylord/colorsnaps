@@ -25,5 +25,5 @@ export function PointerLight() {
     window.addEventListener("pointermove", move, { passive: true });
     return () => { cancelAnimationFrame(frame); window.removeEventListener("pointermove", move); };
   }, []);
-  return <div ref={ref} className="pointer-light" aria-hidden="true" />;
+  return <><div ref={ref} className="pointer-light" aria-hidden="true" /><div className="spark-field" aria-hidden="true">{["✦", "✳", "◆", "✦", "★", "✧", "✳", "✦"].map((star, index) => <span key={index} style={{ "--spark": index } as React.CSSProperties}>{star}</span>)}</div></>;
 }

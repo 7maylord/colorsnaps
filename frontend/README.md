@@ -2,6 +2,8 @@
 
 ColorSnap is a confidential color memory game on Ethereum Sepolia. Sign in with a wallet or email through Reown AppKit, choose a mode, and play with Zama FHEVM.
 
+After sign-in, choose a callsign on the mode screen. It is saved on that device for the connected address; contracts still identify players by wallet address. Each mode opens a short field guide on first visit, and its **How to play** button reopens the guide.
+
 ## Run locally
 
 ```bash
@@ -30,3 +32,5 @@ pnpm build
 ```
 
 The build uses webpack because Turbopack's CSS worker cannot open a local port in some restricted development environments.
+
+The FHE client configures and initializes the browser runtime before Classic sends a creation transaction. If a previous attempt created a puzzle before private reveal failed, the Classic screen resumes the latest game for that address on refresh.
