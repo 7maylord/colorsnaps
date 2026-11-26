@@ -16,6 +16,7 @@ export_abi() {
 export_abi "ColorSnapGame.sol/ColorSnapGame.json" "ColorSnapGame.json"
 export_abi "ColorSnapChallenge.sol/ColorSnapChallenge.json" "ColorSnapChallenge.json"
 export_abi "ColorSnapDaily.sol/ColorSnapDaily.json" "ColorSnapDaily.json"
+export_abi "ColorSnapArcade.sol/ColorSnapArcade.json" "ColorSnapArcade.json"
 export_abi "ColorSnapPlayerRegistry.sol/ColorSnapPlayerRegistry.json" "ColorSnapPlayerRegistry.json"
 export_abi "ColorSnapDuelEscrow.sol/ColorSnapDuelEscrow.json" "ColorSnapDuelEscrow.json"
 export_abi "ColorSnapDuel.sol/ColorSnapDuel.json" "ColorSnapDuel.json"

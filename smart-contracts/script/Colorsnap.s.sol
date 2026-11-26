@@ -8,6 +8,7 @@ import {ColorSnapDaily} from "../src/ColorSnapDaily.sol";
 import {ColorSnapDuelEscrow} from "../src/ColorSnapDuelEscrow.sol";
 import {ColorSnapDuel} from "../src/ColorSnapDuel.sol";
 import {ColorSnapPlayerRegistry} from "../src/ColorSnapPlayerRegistry.sol";
+import {ColorSnapArcade, IColorSnapDailyResults} from "../src/ColorSnapArcade.sol";
 import {ERC7984Mock} from "@openzeppelin/confidential-contracts/mocks/token/ERC7984Mock.sol";
 
 /// @notice Deploy script for the confidential game engine on Sepolia (FHEVM).
@@ -19,6 +20,7 @@ contract ColorSnapScript is Script {
     ColorSnapDuelEscrow public duelEscrow;
     ColorSnapDuel public duel;
     ColorSnapPlayerRegistry public playerRegistry;
+    ColorSnapArcade public arcade;
     uint64 public constant TEST_DUEL_STAKE = 1_000_000;
 
     function setUp() public {}
@@ -34,6 +36,15 @@ contract ColorSnapScript is Script {
         console.log("Owner address:", owner);
         console.log("Chain ID:", chainId);
         console.log("===============================================");
+
+        if (vm.envOr("ARCADE_ONLY", false)) {
+            require(block.chainid == 11155111, "Arcade upgrade is Sepolia only");
+            vm.startBroadcast(deployerPrivateKey);
+            arcade = new ColorSnapArcade(IColorSnapDailyResults(vm.envAddress("EXISTING_DAILY_ADDRESS")));
+            vm.stopBroadcast();
+            console.log("UPGRADED: ColorSnapArcade:", address(arcade));
+            return;
+        }
 
         if (vm.envOr("PROFILE_ONLY", false)) {
             require(block.chainid == 11155111, "Profile upgrade is Sepolia only");
@@ -64,6 +75,7 @@ contract ColorSnapScript is Script {
         game = new ColorSnapGame();
         challenge = new ColorSnapChallenge();
         daily = new ColorSnapDaily();
+        arcade = new ColorSnapArcade(IColorSnapDailyResults(address(daily)));
         playerRegistry = new ColorSnapPlayerRegistry();
         // ERC7984Mock deliberately leaves $_mint(address,uint64) public.
         // It is a Sepolia-only test cUSD so players can obtain funds without
@@ -76,6 +88,7 @@ contract ColorSnapScript is Script {
         console.log("SUCCESS: ColorSnapGame deployed to:", address(game));
         console.log("SUCCESS: ColorSnapChallenge deployed to:", address(challenge));
         console.log("SUCCESS: ColorSnapDaily deployed to:", address(daily));
+        console.log("SUCCESS: ColorSnapArcade deployed to:", address(arcade));
         console.log("SUCCESS: ColorSnapPlayerRegistry deployed to:", address(playerRegistry));
         console.log("SUCCESS: public-mint ERC-7984 test cUSD deployed to:", address(testToken));
         console.log("SUCCESS: ColorSnapDuelEscrow deployed to:", address(duelEscrow));
