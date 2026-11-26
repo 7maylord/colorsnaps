@@ -129,3 +129,25 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 .control-side { padding:clamp(18px,2.5vw,35px); display:flex; flex-direction:column; }.control-main { flex:1; display:flex; flex-direction:column; justify-content:center; }.control-main h2 { margin:10px 0 12px; font:normal clamp(31px,3vw,46px) Georgia,serif; letter-spacing:-.05em; line-height:1.04; }.control-main p { font-size:14px; line-height:1.55; color:#625e6a; }.control-action { width:100%; margin-top:16px; }.status-line { padding:12px 0; border-top:1px solid var(--line); font-size:11px; color:#625e6a; overflow-wrap:anywhere; }.game-notice { margin:50px 0; padding:35px; border:1px solid var(--line); background:#fff9; }.game-notice a { color:#c35b43; }.field { display:block; width:100%; min-height:46px; margin:12px 0; padding:10px 12px; border:1px solid var(--line); background:#fff; border-radius:3px; color:var(--ink); }.sub-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }.sub-actions button { border:1px solid var(--line); background:#fff; padding:9px 11px; font-weight:700; cursor:pointer; }.invite-link { display:block; overflow-wrap:anywhere; font-size:11px; margin-top:10px; color:#6a586b; }.step-tag { display:inline-block; padding:6px 9px; background:#efe4d8; font-size:10px; font-weight:800; letter-spacing:.1em; }.rank-list { padding:0; list-style:none; }.rank-list li { display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--line); font-size:12px; }
 @media(max-width:800px) { .game-panel { grid-template-columns:1fr; }.board-side { border-right:0; border-bottom:1px solid var(--line); }.board-surface { min-height:260px; }.control-side { min-height:250px; }.play-heading { display:block; }.play-heading p { max-width:500px; }.board-piece { height:170px; } }
 @media(max-width:500px) { .board-piece { width:47px; height:145px; }.board-piece small { font-size:8px; }.play-title { font-size:55px; } }
+@media(max-width:500px) {
+  .mode-mark .glass-pieces.compact { transform:scale(.72) rotate(-8deg); }
+  .mode-mark .glass-pieces.compact .glass-piece { height:76px; transform:none; }
+  .play-nav { margin-top:18px; }
+  .play-heading { margin:22px 0; }
+  .play-title { font-size:50px; margin-top:9px; }
+  .play-heading p { margin:4px 0 0; font-size:14px; line-height:1.35; }
+  .board-side { padding:14px; }
+  .board-surface { min-height:205px; gap:24px; }
+  .board-piece { width:46px; height:125px; }
+  .board-hint { font-size:16px; }
+  .control-side { min-height:0; padding:15px; }
+  .control-main h2 { font-size:31px; margin:10px 0 7px; }
+  .control-main p { margin:6px 0; }
+}
+@media(max-width:350px) {
+  .brand { font-size:18px; }
+  .site-head .ink-button { min-height:44px; padding:10px; font-size:11px; }
+  .color-board { gap:5px; }
+  .board-piece { width:40px; height:116px; }
+  .mode-card h2 { font-size:26px; }
+}
