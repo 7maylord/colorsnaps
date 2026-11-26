@@ -4,16 +4,16 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { decodeEventLog, type Address, type Hex } from "viem";
 import { useAccount, usePublicClient, useWalletClient, useWriteContract } from "wagmi";
-import { colorSnapChallengeArtifactAbi, colorSnapDailyAbi, colorSnapPlayerRegistryAbi, SEPOLIA_CHAIN_ID, SEPOLIA_CONTRACTS } from "@/contracts";
+import { colorSnapArcadeAbi, colorSnapChallengeArtifactAbi, colorSnapDailyAbi, SEPOLIA_CHAIN_ID, SEPOLIA_CONTRACTS } from "@/contracts";
 import { decryptClassicValues, decryptPublicBooleanWithProof, encryptClassicSolution } from "@/lib/zama/classic-fhe";
 import { ColorBoard, PlayFrame } from "./PlayFrame";
+import { errorText, notify, useMessageToast } from "@/lib/notifications";
 
 const INITIAL = [0, 1, 2, 3, 4];
 type MatchMode = "daily" | "challenge";
 type Phase = "ready" | "joining" | "waiting" | "revealing" | "playing" | "submitted" | "finalizing" | "resolved" | "error";
 type Challenge = readonly [Address, Address, number, bigint, bigint, Address, boolean, boolean];
 type DailyResult = readonly [boolean, boolean, boolean, boolean, bigint];
-type Rank = { player: Address; submittedAt: bigint };
 
 export default function ConfidentialMatch({ mode }: { mode: MatchMode }) {
   const isDaily = mode === "daily";
@@ -29,10 +29,10 @@ export default function ConfidentialMatch({ mode }: { mode: MatchMode }) {
   const [inputId, setInputId] = useState("");
   const [phase, setPhase] = useState<Phase>("ready");
   const [message, setMessage] = useState(isDaily ? "Join today's shared puzzle." : "Create a link or enter an invite code.");
+  useMessageToast(message, phase);
   const [challenge, setChallenge] = useState<Challenge>();
   const [dailyResult, setDailyResult] = useState<DailyResult>();
-  const [ranks, setRanks] = useState<Rank[]>([]);
-  const [rankNames, setRankNames] = useState<Record<string, string>>({});
+  const [dailyClaimed, setDailyClaimed] = useState(false);
   const [pieces, setPieces] = useState<number[]>(INITIAL);
   const [target, setTarget] = useState<number[]>([]);
   const [selected, setSelected] = useState<number>();
@@ -42,17 +42,12 @@ export default function ConfidentialMatch({ mode }: { mode: MatchMode }) {
   const refresh = useCallback(async (matchId: bigint) => {
     if (!publicClient || !address) return;
     if (isDaily) {
-      const [result, leaderboard] = await Promise.all([
+      const [result, claimed] = await Promise.all([
         publicClient.readContract({ address: contractAddress, abi, functionName: "getPlayerResult", args: [matchId, address] }) as Promise<DailyResult>,
-        publicClient.readContract({ address: contractAddress, abi, functionName: "getLeaderboard", args: [matchId, BigInt(0), BigInt(20)] }) as Promise<Rank[]>,
+        publicClient.readContract({ address: SEPOLIA_CONTRACTS.arcade, abi: colorSnapArcadeAbi, functionName: "dailyClaimed", args: [matchId, address] }) as Promise<boolean>,
       ]);
-      setDailyResult(result); setRanks(leaderboard);
-      const names = await Promise.all(leaderboard.map(async rank => {
-        try { return await publicClient.readContract({ address: SEPOLIA_CONTRACTS.playerRegistry, abi: colorSnapPlayerRegistryAbi, functionName: "names", args: [rank.player] }) as string; }
-        catch { return ""; }
-      }));
-      setRankNames(Object.fromEntries(leaderboard.map((rank, index) => [rank.player.toLowerCase(), names[index]])));
-      if (result[2]) { setPhase("resolved"); setMessage(result[3] ? "Verified. Your mark is on today's board." : "Verified. Tomorrow brings a new pattern."); }
+      setDailyResult(result); setDailyClaimed(claimed);
+      if (result[2]) { setPhase("resolved"); setMessage(result[3] ? claimed ? "Verified. Your 20 points are on the leaderboard." : "Verified win. Claim your 20 points." : "Verified. Tomorrow brings a new pattern."); }
       else if (result[1]) { setPhase("submitted"); setMessage("Your answer is on chain. Verify the public result to enter the ranking."); }
       else if (result[0]) { setPhase("waiting"); setMessage("You're in. Reveal today's private pattern when ready."); }
       else { setPhase("ready"); setMessage("Join today's shared puzzle."); }
@@ -85,14 +80,14 @@ export default function ConfidentialMatch({ mode }: { mode: MatchMode }) {
           const value = invite || saved;
           if (value && /^\d+$/.test(value)) { const challengeId = BigInt(value); if (!cancelled) { setId(challengeId); await refresh(challengeId); } }
         }
-      } catch (error) { if (!cancelled) { setPhase("error"); setMessage(error instanceof Error ? error.message : "Could not load the match."); } }
+      } catch (error) { if (!cancelled) { setPhase("error"); notify("error", errorText(error, "Could not load the match.")); } }
     })();
     return () => { cancelled = true; setTarget([]); setPieces(INITIAL); setSelected(undefined); };
   }, [address, publicClient, isDaily, contractAddress, abi, refresh, params, key]);
 
   useEffect(() => {
     if (phase !== "revealing" || target.length !== 5) return;
-    const timer = setTimeout(() => { setTarget([]); setPhase("playing"); setMessage("Select two pieces to swap them. Submit your arrangement before the deadline."); }, 5000);
+    const timer = setTimeout(() => { setTarget([]); setPhase("playing"); setMessage("Select two pieces to swap them. Submit your arrangement before the deadline."); }, 3000);
     return () => clearTimeout(timer);
   }, [phase, target]);
 
@@ -106,7 +101,7 @@ export default function ConfidentialMatch({ mode }: { mode: MatchMode }) {
 
   async function action(work: () => Promise<void>) {
     setBusy(true);
-    try { await work(); } catch (error) { setPhase("error"); setMessage(error instanceof Error ? error.message : "The action failed."); }
+    try { await work(); } catch (error) { setPhase("error"); notify("error", errorText(error, "The action failed.")); }
     finally { setBusy(false); }
   }
 
@@ -144,7 +139,7 @@ export default function ConfidentialMatch({ mode }: { mode: MatchMode }) {
     setPhase("revealing"); setMessage("Approve the private pattern reveal in your wallet.");
     const ciphertexts = await publicClient.readContract({ address: contractAddress, abi, functionName: "getPuzzleCiphertexts", args: [id], account: address }) as readonly Hex[];
     const values = await decryptClassicValues({ publicClient, walletClient, playerAddress: address, contractAddress, ciphertexts });
-    setTarget([...values]); setPieces(INITIAL); setMessage("Memorize the pattern. Five seconds.");
+    setTarget([...values]); setPieces(INITIAL); setMessage("Memorize the pattern. Three seconds.");
   }); }
 
   async function submit() { await action(async () => {
@@ -160,8 +155,21 @@ export default function ConfidentialMatch({ mode }: { mode: MatchMode }) {
     const ciphertext = await publicClient.readContract({ address: contractAddress, abi, functionName: "getPublicResultCiphertext", args: [id, address] }) as Hex;
     const proof = await decryptPublicBooleanWithProof({ publicClient, ciphertext });
     setMessage("Approve the proof verification transaction.");
-    await transaction("finalizeResult", [id, address, [...proof.cleartexts], proof.decryptionProof]); await refresh(id);
+    await transaction("finalizeResult", [id, address, [...proof.cleartexts], proof.decryptionProof]);
+    if (isDaily && proof.solved) await claimDailyPoints(id);
+    await refresh(id);
   }); }
+
+  async function claimDailyPoints(day: bigint) {
+    if (!publicClient) throw new Error("Sepolia RPC is unavailable.");
+    setMessage("Approve the 20 point Daily claim in your wallet.");
+    const hash = await writeContractAsync({ address: SEPOLIA_CONTRACTS.arcade, abi: colorSnapArcadeAbi, functionName: "claimDaily", args: [day], chainId: SEPOLIA_CHAIN_ID });
+    const receipt = await publicClient.waitForTransactionReceipt({ hash });
+    if (receipt.status !== "success") throw new Error("Daily points claim reverted.");
+    notify("success", "+20 Daily points! Check the leaderboard.");
+  }
+
+  async function claimDaily() { await action(async () => { if (id === undefined) return; await claimDailyPoints(id); await refresh(id); }); }
 
   async function resolve() { await action(async () => { if (id === undefined) return; await transaction("resolveChallenge", [id]); await refresh(id); }); }
   async function cancel() { await action(async () => { if (id === undefined) return; await transaction("cancelChallenge", [id]); await refresh(id); }); }
@@ -171,16 +179,16 @@ export default function ConfidentialMatch({ mode }: { mode: MatchMode }) {
 
   return <PlayFrame mode={isDaily ? "Daily" : "Challenge"} number={isDaily ? "02" : "03"} description={isDaily ? "One shared secret each UTC day. One attempt to join the board." : "Two players, one secret. Invite a friend, then race the five minute clock."}>
     <section className="game-panel"><div className="board-side"><div className="board-top"><span>{isDaily ? `UTC DAY ${id ?? "…"}` : `INVITE ${id ?? "NEW"}`}</span><span>{phase === "revealing" ? "PRIVATE REVEAL" : "COLOR WORKBENCH"}</span></div><div className="board-surface"><ColorBoard pieces={phase === "revealing" && target.length === 5 ? target : pieces} selected={selected} reveal={phase === "revealing"} onChoose={phase === "playing" ? choose : undefined} /><div className="board-hint">{phase === "playing" ? "Select two pieces to swap." : "A secret pattern, visible only to its players."}</div></div><div className="board-top"><span>✳ CORAL · ◈ BLUE · ✦ MINT · ◎ AMBER · ✣ VIOLET</span></div></div>
-      <div className="control-side"><div className="control-top"><span>{isDaily ? "TODAY'S PANE" : "TWO PLAYER RACK"}</span><span>{phase.toUpperCase()}</span></div><div className="control-main"><span className="step-tag">{isDaily ? new Date().toLocaleDateString("en-GB", { timeZone: "UTC", day: "numeric", month: "short", year: "numeric" }).toUpperCase() : challenge?.[2] === 2 ? "LIVE" : "INVITE"}</span><h2>{isDaily ? "Leave your mark." : "Play together."}</h2><p role="status" aria-live="polite">{message}</p>
+      <div className="control-side"><div className="control-top"><span>{isDaily ? "TODAY'S PANE" : "TWO PLAYER RACK"}</span><span>{phase.toUpperCase()}</span></div><div className="control-main"><span className="step-tag">{isDaily ? new Date().toLocaleDateString("en-GB", { timeZone: "UTC", day: "numeric", month: "short", year: "numeric" }).toUpperCase() : challenge?.[2] === 2 ? "LIVE" : "INVITE"}</span><h2>{isDaily ? "Leave your mark." : "Play together."}</h2>
         {isDaily && phase === "ready" && <button disabled={busy} className="primary-action control-action" onClick={start}>Join today's puzzle →</button>}
         {!isDaily && !id && <><button disabled={busy} className="primary-action control-action" onClick={start}>Create challenge →</button><input className="field" inputMode="numeric" placeholder="Or enter invite ID" value={inputId} onChange={event => setInputId(event.target.value)} /><button disabled={busy || !inputId} className="text-action" onClick={() => join()}>Join invite →</button></>}
         {!isDaily && id && challenge?.[2] === 1 && <><span className="invite-link">{inviteUrl}</span><div className="sub-actions"><button onClick={() => navigator.clipboard.writeText(inviteUrl)}>Copy invite</button>{challenge[0].toLowerCase() !== address?.toLowerCase() && <button disabled={busy} onClick={() => join(id.toString())}>Join challenge</button>}{challenge[0].toLowerCase() === address?.toLowerCase() && <button disabled={busy} onClick={cancel}>Cancel</button>}<button onClick={() => refresh(id)}>Refresh</button></div></>}
         {mayPlay && phase === "waiting" && <button disabled={busy} className="primary-action control-action" onClick={reveal}>Reveal pattern →</button>}
         {phase === "playing" && <button disabled={busy} className="primary-action control-action" onClick={submit}>Submit arrangement →</button>}
         {phase === "submitted" && <button disabled={busy} className="primary-action control-action" onClick={finalize}>Verify result →</button>}
+        {isDaily && phase === "resolved" && dailyResult?.[3] && !dailyClaimed && <button disabled={busy} className="primary-action control-action" onClick={claimDaily}>Claim 20 points →</button>}
         {!isDaily && id && challenge?.[2] === 2 && <div className="sub-actions"><button disabled={busy} onClick={resolve}>Resolve if ready</button><button onClick={() => refresh(id)}>Refresh</button></div>}
         {phase === "error" && id && <button className="text-action" onClick={() => refresh(id)}>Refresh state</button>}
-        {isDaily && ranks.length > 0 && <ol className="rank-list">{ranks.map((rank,index) => <li key={rank.player}><span>{index + 1}. {rankNames[rank.player.toLowerCase()] || `${rank.player.slice(0,6)}…${rank.player.slice(-4)}`}</span><span>{new Date(Number(rank.submittedAt)*1000).toLocaleTimeString("en-GB",{ timeZone:"UTC" })} UTC</span></li>)}</ol>}
       </div><div className="status-line">{isDaily ? "One verified result per UTC day" : challenge?.[2] === 2 ? `Deadline: ${new Date(Number(challenge[3])*1000).toLocaleTimeString()} · Creator ${challenge[6] ? "submitted" : "waiting"} · Friend ${challenge[7] ? "submitted" : "waiting"}` : "A challenge begins when the second player joins"}</div></div>
     </section>
   </PlayFrame>;

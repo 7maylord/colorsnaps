@@ -5,7 +5,8 @@ import { createFhevmClient, initFhevmRuntime, setFhevmRuntimeConfig } from "@fhe
 import type { Hex, PublicClient, WalletClient } from "viem";
 
 const PUZZLE_SIZE = 5;
-const PERMIT_DURATION_SECONDS = 10 * 60;
+// The SDK only accepts whole-day permit durations.
+const PERMIT_DURATION_SECONDS = 24 * 60 * 60;
 let runtimeReady: Promise<void> | undefined;
 
 export function prepareFhevmRuntime(): Promise<void> {
@@ -84,6 +85,27 @@ export async function encryptClassicSolution(parameters: {
     handles: encrypted.encryptedValues as unknown as readonly [Hex, Hex, Hex, Hex, Hex],
     inputProof: encrypted.inputProof as Hex,
   };
+}
+
+export async function encryptArcadeSolution(parameters: {
+  readonly publicClient: PublicClient;
+  readonly contractAddress: Hex;
+  readonly playerAddress: Hex;
+  readonly bottleIds: readonly number[];
+}): Promise<{ readonly handles: readonly Hex[]; readonly inputProof: Hex }> {
+  const { publicClient, contractAddress, playerAddress, bottleIds } = parameters;
+  if (bottleIds.length < 5 || bottleIds.length > 7 || new Set(bottleIds).size !== bottleIds.length ||
+      bottleIds.some((id) => !Number.isInteger(id) || id < 0 || id >= bottleIds.length)) {
+    throw new Error("The Classic arrangement must contain each bottle exactly once.");
+  }
+  const fhevm = await createClassicFheClient(publicClient);
+  const encrypted = await fhevm.encryptValues({
+    contractAddress,
+    userAddress: playerAddress,
+    values: bottleIds.map((value) => ({ type: "uint8", value })),
+  });
+  if (encrypted.encryptedValues.length !== bottleIds.length) throw new Error("The FHE relayer returned an incomplete Classic input.");
+  return { handles: encrypted.encryptedValues as unknown as readonly Hex[], inputProof: encrypted.inputProof as Hex };
 }
 
 export async function decryptClassicValues(parameters: {

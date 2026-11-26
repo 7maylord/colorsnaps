@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { headers } from 'next/headers'
 import './globals.css';
 import ContextProvider from '@/context'
+import ToastHost from '@/components/ToastHost'
 
 
 export const viewport = {
@@ -30,6 +31,7 @@ export default async function RootLayout({
         <body>
         <ContextProvider cookies={cookies}>
           {children}
+          <ToastHost />
         </ContextProvider>
       </body>
     </html>

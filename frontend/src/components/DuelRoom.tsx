@@ -6,9 +6,15 @@ import { useAccount, usePublicClient, useWalletClient, useWriteContract } from "
 import { colorSnapDuelAbi, colorSnapDuelEscrowAbi, colorSnapTestTokenAbi, SEPOLIA_CHAIN_ID, SEPOLIA_CONTRACTS } from "@/contracts";
 import { decryptClassicValues, decryptPublicBooleanWithProof, encryptClassicSolution, encryptStake } from "@/lib/zama/classic-fhe";
 import { ColorBoard, PlayFrame } from "./PlayFrame";
+import { notify, errorText, useMessageToast } from "@/lib/notifications";
 
 type EscrowState = readonly [Address, Address, number, boolean, boolean];
 const INITIAL = [0, 1, 2, 3, 4];
+const PUBLIC_MINT_ABI = [{
+  type: "function", name: "$_mint", stateMutability: "nonpayable",
+  inputs: [{ name: "to", type: "address" }, { name: "amount", type: "uint64" }],
+  outputs: [{ name: "transferred", type: "bytes32" }],
+}] as const;
 
 export default function DuelRoom() {
   const { address } = useAccount();
@@ -30,7 +36,9 @@ export default function DuelRoom() {
   const [selected, setSelected] = useState<number>();
   const [phase, setPhase] = useState("ready");
   const [message, setMessage] = useState("Enter an opponent address, or open an existing duel.");
+  useMessageToast(message, phase);
   const [busy, setBusy] = useState(false);
+  const [minted, setMinted] = useState(false);
   const key = address ? `colorsnap:duel:${SEPOLIA_CHAIN_ID}:${SEPOLIA_CONTRACTS.duelEscrow.toLowerCase()}:${address.toLowerCase()}` : "";
   const mine = state && address ? state[0].toLowerCase() === address.toLowerCase() ? 0 : state[1].toLowerCase() === address.toLowerCase() ? 1 : -1 : -1;
 
@@ -55,6 +63,7 @@ export default function DuelRoom() {
   useEffect(() => {
     if (!address || !publicClient) return;
     setRecovery(false);
+    setMinted(false);
     let cancelled = false;
     (async () => {
       try {
@@ -68,18 +77,20 @@ export default function DuelRoom() {
         if (cancelled) return;
         setStake(amount); setDecimals(units); setGasBalance(ethBalance);
         if (tokenAddress.toLowerCase() !== SEPOLIA_CONTRACTS.testToken.toLowerCase() || refereeAddress.toLowerCase() !== SEPOLIA_CONTRACTS.duel.toLowerCase()) throw new Error("Escrow token or referee does not match the configured deployment.");
-        try { const timeout = await publicClient.readContract({ address: SEPOLIA_CONTRACTS.duelEscrow, abi: [{ type: "function", name: "FUNDING_TIMEOUT", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] }] as const, functionName: "FUNDING_TIMEOUT" }); setRecovery(timeout > BigInt(0)); }
-        catch { setRecovery(false); }
+        try { const timeout = await publicClient.readContract({ address: SEPOLIA_CONTRACTS.duelEscrow, abi: [{ type: "function", name: "FUNDING_TIMEOUT", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] }] as const, functionName: "FUNDING_TIMEOUT" }); setRecovery(timeout > BigInt(0)); if (timeout === BigInt(0)) notify("warning", "Duel deposits are disabled because funding recovery is unavailable."); }
+        catch { setRecovery(false); notify("warning", "Duel deposits are disabled because funding recovery could not be checked."); }
         const saved = key && localStorage.getItem(key);
         const query = new URLSearchParams(location.search).get("duel");
         const value = query || saved;
         if (value && /^\d+$/.test(value)) { const duelId = BigInt(value); setId(duelId); await refresh(duelId); }
-      } catch (error) { if (!cancelled) setMessage(error instanceof Error ? error.message : "Cannot load escrow configuration."); }
+      } catch (error) { if (!cancelled) notify("error", errorText(error, "Cannot load escrow configuration.")); }
     })();
     return () => { cancelled = true; setTarget([]); setPieces(INITIAL); setSelected(undefined); };
   }, [address, publicClient, key, refresh]);
 
-  useEffect(() => { if (phase !== "revealing" || target.length !== 5) return; const timer = setTimeout(() => { setTarget([]); setPhase("playing"); setMessage("Swap pairs until you can recall the shared pattern."); }, 5000); return () => clearTimeout(timer); }, [phase, target]);
+  useEffect(() => { if (gasBalance === BigInt(0)) notify("warning", "Add Sepolia ETH for transaction gas before playing."); }, [gasBalance]);
+
+  useEffect(() => { if (phase !== "revealing" || target.length !== 5) return; const timer = setTimeout(() => { setTarget([]); setPhase("playing"); setMessage("Swap pairs until you can recall the shared pattern."); }, 3000); return () => clearTimeout(timer); }, [phase, target]);
 
   async function send(contract: "escrow" | "referee" | "token", functionName: string, args: readonly unknown[] = []) {
     if (!publicClient) throw new Error("Sepolia RPC unavailable.");
@@ -90,7 +101,7 @@ export default function DuelRoom() {
     if (receipt.status !== "success") throw new Error("Transaction reverted.");
     return receipt;
   }
-  async function run(work: () => Promise<void>) { setBusy(true); try { await work(); } catch (error) { setMessage(error instanceof Error ? error.message : "The action failed."); } finally { setBusy(false); } }
+  async function run(work: () => Promise<void>) { const priorPhase = phase; setBusy(true); try { await work(); } catch (error) { setPhase(priorPhase); notify("error", errorText(error, "The action failed.")); } finally { setBusy(false); } }
   function choose(index: number) { if (phase !== "playing") return; if (selected === undefined) { setSelected(index); return; } if (selected === index) { setSelected(undefined); return; } setPieces(current => { const next = [...current]; [next[selected], next[index]] = [next[index], next[selected]]; return next; }); setSelected(undefined); }
 
   async function create() { await run(async () => {
@@ -103,8 +114,18 @@ export default function DuelRoom() {
     const duelId = (event.args as unknown as { duelId: bigint }).duelId;
     setId(duelId); if (key) localStorage.setItem(key, duelId.toString()); history.replaceState(null, "", `/duel?duel=${duelId}`); await refresh(duelId);
   }); }
-  async function open() { if (!/^\d+$/.test(inputId)) { setMessage("Enter a numeric duel ID."); return; } const duelId = BigInt(inputId); setId(duelId); if (key) localStorage.setItem(key, duelId.toString()); history.replaceState(null, "", `/duel?duel=${duelId}`); await refresh(duelId); }
-  async function mint() { await run(async () => { if (!address || stake === undefined) return; setMessage("Approve public mint of test cUSD."); await send("token", "$_mint", [address, stake * BigInt(2)]); setMessage("Test cUSD minted. You can fund the duel."); }); }
+  async function open() { if (!/^\d+$/.test(inputId)) { notify("error", "Enter a numeric duel ID."); return; } await run(async () => { const duelId = BigInt(inputId); await refresh(duelId); setId(duelId); if (key) localStorage.setItem(key, duelId.toString()); history.replaceState(null, "", `/duel?duel=${duelId}`); }); }
+  async function mint() { await run(async () => {
+    if (!address || stake === undefined || !publicClient) throw new Error("Connect on Sepolia and wait for the stake amount to load.");
+    const amount = stake * BigInt(2);
+    if (amount > BigInt("18446744073709551615")) throw new Error("The test mint amount exceeds the token limit.");
+    setMessage("Approve the public test cUSD mint in your wallet.");
+    const hash = await writeContractAsync({ address: SEPOLIA_CONTRACTS.testToken, abi: PUBLIC_MINT_ABI, functionName: "$_mint", args: [address, amount], chainId: SEPOLIA_CHAIN_ID });
+    const receipt = await publicClient.waitForTransactionReceipt({ hash });
+    if (receipt.status !== "success") throw new Error("Test cUSD mint reverted.");
+    setMinted(true);
+    setMessage("Test cUSD minted to your wallet. You can now fund a duel.");
+  }); }
   async function deposit() { await run(async () => {
     if (!recovery) throw new Error("Timeout recovery is not available on this deployed escrow.");
     if (!id || !address || !publicClient || stake === undefined) return;
@@ -126,7 +147,7 @@ export default function DuelRoom() {
     if (!id || !address || !publicClient || !walletClient) return;
     setPhase("revealing"); setMessage("Approve the private pattern reveal.");
     const ciphertexts = await publicClient.readContract({ address: SEPOLIA_CONTRACTS.duel, abi: colorSnapDuelAbi, functionName: "getPuzzleCiphertexts", args: [id], account: address }) as readonly Hex[];
-    const values = await decryptClassicValues({ publicClient, walletClient, playerAddress: address, contractAddress: SEPOLIA_CONTRACTS.duel, ciphertexts }); setTarget([...values]); setPieces(INITIAL); setMessage("Memorize the pattern. Five seconds.");
+    const values = await decryptClassicValues({ publicClient, walletClient, playerAddress: address, contractAddress: SEPOLIA_CONTRACTS.duel, ciphertexts }); setTarget([...values]); setPieces(INITIAL); setMessage("Memorize the pattern. Three seconds.");
   }); }
   async function submit() { await run(async () => {
     if (!id || !address || !publicClient) return;
@@ -147,12 +168,10 @@ export default function DuelRoom() {
 
   return <PlayFrame mode="Duel" number="04" description="Two players place confidential test cUSD on the balance. A verified result settles the stake.">
     <section className="game-panel"><div className="board-side"><div className="board-top"><span>THE BALANCE / {id ? `DUEL ${id}` : "NEW"}</span><span>TEST cUSD</span></div><div className="board-surface"><ColorBoard pieces={phase === "revealing" && target.length === 5 ? target : pieces} selected={selected} reveal={phase === "revealing"} onChoose={phase === "playing" ? choose : undefined} /><div className="board-hint">{phase === "playing" ? "Swap pieces to rebuild the pattern." : "Both players see the same private pattern."}</div></div><div className="board-top"><span>✳ CORAL · ◈ BLUE · ✦ MINT · ◎ AMBER · ✣ VIOLET</span></div></div>
-      <div className="control-side"><div className="control-top"><span>ESCROW STATUS</span><span>{phase.toUpperCase()}</span></div><div className="control-main"><span className="step-tag">STAKE {stake === undefined || decimals === undefined ? "…" : `${Number(stake) / 10 ** decimals} cUSD`}</span><h2>Play for the pot.</h2><p role="status" aria-live="polite">{message}</p>
-        {!recovery && <p className="wallet-warning">The deployed escrow has no timeout refund or its wiring could not be verified. Deposits stay disabled.</p>}
-        {gasBalance === BigInt(0) && <p className="wallet-warning">Add Sepolia ETH for transaction gas before playing.</p>}
+      <div className="control-side"><div className="control-top"><span>ESCROW STATUS</span><span>{phase.toUpperCase()}</span></div><div className="duel-faucet"><span className="duel-faucet-icon" aria-hidden="true">✦</span><div><span className="duel-faucet-kicker">TEST TOKEN FAUCET</span><strong>Need cUSD to play?</strong><small>Mint two stake amounts to your wallet. Free test tokens; Sepolia ETH pays transaction gas.</small></div><button type="button" disabled={busy || stake === undefined} onClick={mint}>{busy ? "WAIT…" : minted ? "MINT MORE ↗" : "MINT TEST cUSD ↗"}</button></div><div className="control-main"><span className="step-tag">STAKE {stake === undefined || decimals === undefined ? "…" : `${Number(stake) / 10 ** decimals} cUSD`}</span><h2>Play for the pot.</h2>
         {!id && <><input className="field" placeholder="Opponent 0x address" value={opponent} onChange={event => setOpponent(event.target.value)} /><button disabled={busy || !recovery} className="primary-action control-action" onClick={create}>Create duel →</button><input className="field" inputMode="numeric" placeholder="Or enter duel ID" value={inputId} onChange={event => setInputId(event.target.value)} /><button className="text-action" onClick={open}>Open duel →</button></>}
         {id && <span className="invite-link">{typeof window !== "undefined" ? `${location.origin}/duel?duel=${id}` : `Duel ${id}`}</span>}
-        {canDeposit && <div className="sub-actions"><button disabled={busy} onClick={mint}>Mint test cUSD</button><button disabled={busy} onClick={deposit}>Deposit stake</button><button disabled={busy} onClick={verifyDeposit}>Verify deposit</button></div>}
+        {canDeposit && <div className="sub-actions"><button disabled={busy} onClick={deposit}>Deposit stake</button><button disabled={busy} onClick={verifyDeposit}>Verify deposit</button></div>}
         {id && recovery && state && (state[2] === 1 || state[2] === 2) && <button disabled={busy} className="text-action" onClick={cancel}>Recover after funding timeout</button>}
         {state?.[2] === 3 && !started && <button disabled={busy} className="primary-action control-action" onClick={begin}>Start duel →</button>}
         {started && !submitted && phase === "active" && <button disabled={busy} className="primary-action control-action" onClick={reveal}>Reveal pattern →</button>}

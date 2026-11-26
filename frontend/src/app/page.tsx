@@ -18,10 +18,10 @@ export default function Home() {
         <div className="tiny-label"><span className="live-dot" /> THE GAME BEGINS IN PRIVATE</div>
         <h1>Remember<br /><em>the light.</em><br />Reveal your<br />instinct.</h1>
         <p>A five-piece memory game where the pattern stays yours. Pick a mode, hold the colors in your mind, and let confidential computation settle the score.</p>
-        <div className="entry-actions"><WalletConnectButton method="wallet" /><WalletConnectButton method="email" /></div>
-        <div className="entry-foot">A wallet or email gives you a Sepolia account. Pick a public callsign after sign-in if you want to appear by name on the Daily board.</div>
+        <div className="entry-actions"><WalletConnectButton play /></div>
+        <div className="entry-foot">Choose wallet or email in the sign-in window. Then pick your mode and jump in.</div>
       </section>
-      <div className="prism-stage" aria-label="Five glass colors"><div className="stage-ring ring-one" /><div className="stage-ring ring-two" /><GlassPieces /></div>
+      <div className="prism-stage" aria-label="Five glass colors"><div className="stage-ring ring-one" /><div className="stage-ring ring-two" /><div className="stage-sparkles" aria-hidden="true"><span>✦</span><span>✳</span><span>★</span><span>✧</span><span>✦</span></div><GlassPieces /></div>
     </div>
     <footer className="site-foot"><span>01 / 04 · CHOOSE YOUR MODE</span><span>POWERED BY ZAMA FHE</span></footer>
   </main>;

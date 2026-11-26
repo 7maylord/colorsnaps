@@ -4,8 +4,9 @@ import { useCallback, useEffect, useState } from "react";
 import { decodeEventLog, type Hex } from "viem";
 import { useAccount, usePublicClient, useWalletClient, useWriteContract } from "wagmi";
 import { CHAIN_IDS } from "@/config/chains";
-import { colorSnapGameAbi, SEPOLIA_CONTRACTS, SEPOLIA_CHAIN_ID } from "@/contracts";
-import { decryptClassicBoolean, decryptClassicValues, encryptClassicSolution, prepareFhevmRuntime } from "@/lib/zama/classic-fhe";
+import { colorSnapArcadeAbi, SEPOLIA_CONTRACTS, SEPOLIA_CHAIN_ID } from "@/contracts";
+import { decryptClassicValues, decryptPublicBooleanWithProof, encryptArcadeSolution, prepareFhevmRuntime } from "@/lib/zama/classic-fhe";
+import { errorText, notify, useMessageToast } from "@/lib/notifications";
 
 type Phase = "idle" | "creating" | "revealing" | "playing" | "submitting" | "decrypting" | "won" | "lost" | "error";
 type Saved = { id?: string; pending?: Hex; pendingType?: "create" | "submit"; dismissed?: boolean };
@@ -21,31 +22,55 @@ export function useClassicSession() {
   const [pieces, setPieces] = useState<number[]>(START);
   const [selected, setSelected] = useState<number>();
   const [phase, setPhase] = useState<Phase>("idle");
+  const [size, setSize] = useState(5);
+  const [completedGames, setCompletedGames] = useState(0);
+  const [points, setPoints] = useState(0);
   const [message, setMessage] = useState("Create a puzzle to begin.");
-  const contractAddress = SEPOLIA_CONTRACTS.game;
+  useMessageToast(message, phase);
+  const contractAddress = SEPOLIA_CONTRACTS.arcade;
   const key = address ? `colorsnap:classic:${SEPOLIA_CHAIN_ID}:${contractAddress.toLowerCase()}:${address.toLowerCase()}` : "";
 
   const save = useCallback((saved: Saved) => { if (key) localStorage.setItem(key, JSON.stringify(saved)); }, [key]);
+  const loadStats = useCallback(async () => {
+    if (!address || !publicClient) return;
+    const [completed, earned, nextSize] = await Promise.all([
+      publicClient.readContract({ address: contractAddress, abi: colorSnapArcadeAbi, functionName: "completedGames", args: [address] }) as Promise<bigint>,
+      publicClient.readContract({ address: contractAddress, abi: colorSnapArcadeAbi, functionName: "points", args: [address] }) as Promise<bigint>,
+      publicClient.readContract({ address: contractAddress, abi: colorSnapArcadeAbi, functionName: "nextPuzzleSize", args: [address] }) as Promise<number>,
+    ]);
+    setCompletedGames(Number(completed)); setPoints(Number(earned)); setSize(Number(nextSize));
+  }, [address, publicClient, contractAddress]);
   const reveal = useCallback(async (gameId: bigint) => {
     if (!address || !publicClient || !walletClient) throw new Error("Wallet is not ready for private reveal.");
     setPhase("revealing"); setMessage("Approve the private reveal in your wallet.");
-    const ciphertexts = await publicClient.readContract({ address: contractAddress, abi: colorSnapGameAbi, functionName: "getPuzzleCiphertexts", args: [gameId], account: address });
+    const ciphertexts = await publicClient.readContract({ address: contractAddress, abi: colorSnapArcadeAbi, functionName: "getPuzzleCiphertexts", args: [gameId], account: address }) as readonly Hex[];
     const values = await decryptClassicValues({ publicClient, walletClient, playerAddress: address, contractAddress, ciphertexts });
-    setTarget([...values]); setPieces(START); setSelected(undefined);
-    setMessage("Memorize your private pattern. It hides in five seconds.");
+    setSize(values.length); setTarget([...values]); setPieces(Array.from({ length: values.length }, (_, i) => i)); setSelected(undefined);
+    setMessage("Memorize your private pattern. It hides in three seconds.");
   }, [address, publicClient, walletClient, contractAddress]);
 
   const showResult = useCallback(async (gameId: bigint) => {
-    if (!address || !publicClient || !walletClient) throw new Error("Wallet is not ready for result decryption.");
-    setPhase("decrypting"); setMessage("Approve private result decryption.");
-    const ciphertext = await publicClient.readContract({ address: contractAddress, abi: colorSnapGameAbi, functionName: "getSolutionResult", args: [gameId], account: address });
-    const solved = await decryptClassicBoolean({ publicClient, walletClient, playerAddress: address, contractAddress, ciphertext });
+    if (!publicClient) throw new Error("Sepolia RPC is unavailable.");
+    setPhase("decrypting"); setMessage("Verifying your encrypted result for points…");
+    const game = await publicClient.readContract({ address: contractAddress, abi: colorSnapArcadeAbi, functionName: "getGame", args: [gameId] }) as readonly [Hex, number, number, bigint, boolean, boolean];
+    let solved = game[5];
+    if (!game[4]) {
+      const ciphertext = await publicClient.readContract({ address: contractAddress, abi: colorSnapArcadeAbi, functionName: "getPublicResultCiphertext", args: [gameId] }) as Hex;
+      const proof = await decryptPublicBooleanWithProof({ publicClient, ciphertext });
+      solved = proof.solved;
+      setMessage("Approve the result proof to receive Classic points.");
+      const hash = await writeContractAsync({ address: contractAddress, abi: colorSnapArcadeAbi, functionName: "finalizeResult", args: [gameId, [...proof.cleartexts], proof.decryptionProof], chainId: SEPOLIA_CHAIN_ID });
+      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      if (receipt.status !== "success") throw new Error("Result proof was not accepted.");
+    }
+    await loadStats();
     setPhase(solved ? "won" : "lost"); setMessage(solved ? "The confidential referee verified your match." : "The pattern did not match. Try another puzzle.");
-  }, [address, publicClient, walletClient, contractAddress]);
+  }, [publicClient, contractAddress, writeContractAsync, loadStats]);
 
   useEffect(() => {
     setId(undefined); setTarget([]); setPieces(START); setSelected(undefined); setPhase("idle"); setMessage("Create a puzzle to begin.");
     if (!key || !publicClient || !address) return;
+    void loadStats();
     let cancelled = false;
     (async () => {
       try {
@@ -57,34 +82,34 @@ export function useClassicSession() {
           const receipt = await publicClient.waitForTransactionReceipt({ hash: saved.pending });
           if (receipt.status !== "success") throw new Error("The pending transaction reverted.");
           if (saved.pendingType === "create") {
-            const event = receipt.logs.map(log => { try { return decodeEventLog({ abi: colorSnapGameAbi, data: log.data, topics: log.topics }); } catch { return undefined; } }).find(event => event?.eventName === "GameCreated");
+            const event = receipt.logs.map(log => { try { return decodeEventLog({ abi: colorSnapArcadeAbi, data: log.data, topics: log.topics }); } catch { return undefined; } }).find(event => event?.eventName === "GameCreated");
             if (event?.eventName !== "GameCreated") throw new Error("Game creation event was not found.");
-            gameId = event.args.gameId;
+            gameId = (event.args as unknown as { gameId: bigint }).gameId;
           }
           if (gameId) save({ id: gameId.toString() });
         }
         if (!gameId && !saved.dismissed) {
-          const games = await publicClient.readContract({ address: contractAddress, abi: [{ type: "function", name: "getPlayerGames", stateMutability: "view", inputs: [{ name: "player", type: "address" }], outputs: [{ type: "uint256[]" }] }] as const, functionName: "getPlayerGames", args: [address] });
+          const games = await publicClient.readContract({ address: contractAddress, abi: colorSnapArcadeAbi, functionName: "getPlayerGames", args: [address] }) as bigint[];
           gameId = games.at(-1);
           if (gameId) save({ id: gameId.toString() });
         }
         if (cancelled || !gameId) return;
         setId(gameId);
-        const game = await publicClient.readContract({ address: contractAddress, abi: [{ type: "function", name: "getGame", stateMutability: "view", inputs: [{ name: "gameId", type: "uint256" }], outputs: [{ name: "player", type: "address" }, { name: "status", type: "uint8" }, { name: "createdAt", type: "uint256" }, { name: "hasSubmission", type: "bool" }, { name: "submittedAt", type: "uint256" }] }] as const, functionName: "getGame", args: [gameId] });
+        const game = await publicClient.readContract({ address: contractAddress, abi: colorSnapArcadeAbi, functionName: "getGame", args: [gameId] }) as readonly [Hex, number, number, bigint, boolean, boolean];
         if (game[0].toLowerCase() !== address.toLowerCase()) throw new Error("Saved game belongs to another account.");
-        if (game[1] === 3) { save({ dismissed: true }); return; }
+        if (game[2] === 3) { save({ dismissed: true }); return; }
         if (cancelled) return;
-        if (game[3]) await showResult(gameId); else await reveal(gameId);
-      } catch (error) { if (!cancelled) { setPhase("error"); setMessage(error instanceof Error ? error.message : "Could not restore the game."); } }
+        if (game[2] === 2) await showResult(gameId); else await reveal(gameId);
+      } catch (error) { if (!cancelled) { setPhase("error"); notify("error", errorText(error, "Could not restore the game.")); } }
     })();
     return () => { cancelled = true; };
-  }, [key, address, publicClient, contractAddress, save, reveal, showResult]);
+  }, [key, address, publicClient, contractAddress, save, reveal, showResult, loadStats]);
 
   useEffect(() => {
-    if (phase !== "revealing" || target.length !== 5) return;
-    const timer = window.setTimeout(() => { setTarget([]); setPhase("playing"); setMessage("Select two pieces to swap them. Submit when the pattern feels right."); }, 5000);
+    if (phase !== "revealing" || target.length !== size) return;
+    const timer = window.setTimeout(() => { setTarget([]); setPhase("playing"); setMessage("Select two pieces to swap them. Submit when the pattern feels right."); }, 3000);
     return () => clearTimeout(timer);
-  }, [phase, target]);
+  }, [phase, target, size]);
 
   function choose(index: number) {
     if (phase !== "playing") return;
@@ -100,29 +125,29 @@ export function useClassicSession() {
       setPhase("creating"); setMessage("Loading the private game engine…");
       await prepareFhevmRuntime();
       setMessage("Approve puzzle creation in your wallet.");
-      const hash = await writeContractAsync({ address: contractAddress, abi: colorSnapGameAbi, functionName: "createClassicGame" });
+      const hash = await writeContractAsync({ address: contractAddress, abi: colorSnapArcadeAbi, functionName: "createClassicGame", chainId: SEPOLIA_CHAIN_ID });
       save({ pending: hash, pendingType: "create" }); setMessage("Waiting for Sepolia confirmation…");
       const receipt = await publicClient.waitForTransactionReceipt({ hash });
       if (receipt.status !== "success") throw new Error("Puzzle creation reverted.");
-      const event = receipt.logs.map(log => { try { return decodeEventLog({ abi: colorSnapGameAbi, data: log.data, topics: log.topics }); } catch { return undefined; } }).find(event => event?.eventName === "GameCreated");
+      const event = receipt.logs.map(log => { try { return decodeEventLog({ abi: colorSnapArcadeAbi, data: log.data, topics: log.topics }); } catch { return undefined; } }).find(event => event?.eventName === "GameCreated");
       if (event?.eventName !== "GameCreated") throw new Error("Game creation event was not found.");
-      const gameId = event.args.gameId;
+      const gameId = (event.args as unknown as { gameId: bigint }).gameId;
       setId(gameId); save({ id: gameId.toString() }); await reveal(gameId);
-    } catch (error) { setPhase("error"); setMessage(error instanceof Error ? error.message : "Could not create the puzzle."); }
+    } catch (error) { setPhase("error"); notify("error", errorText(error, "Could not create the puzzle.")); }
   }
 
   async function submit() {
     if (!id || !address || !publicClient || !walletClient) return;
     try {
       setPhase("submitting"); setMessage("Encrypting your arrangement…");
-      const encrypted = await encryptClassicSolution({ publicClient, contractAddress, playerAddress: address, bottleIds: pieces });
+      const encrypted = await encryptArcadeSolution({ publicClient, contractAddress, playerAddress: address, bottleIds: pieces });
       setMessage("Approve encrypted submission in your wallet.");
-      const hash = await writeContractAsync({ address: contractAddress, abi: colorSnapGameAbi, functionName: "submitSolution", args: [id, encrypted.handles, encrypted.inputProof] });
+      const hash = await writeContractAsync({ address: contractAddress, abi: colorSnapArcadeAbi, functionName: "submitSolution", args: [id, encrypted.handles, encrypted.inputProof], chainId: SEPOLIA_CHAIN_ID });
       save({ id: id.toString(), pending: hash, pendingType: "submit" }); setMessage("Waiting for Sepolia confirmation…");
       const receipt = await publicClient.waitForTransactionReceipt({ hash });
       if (receipt.status !== "success") throw new Error("Submission reverted.");
       save({ id: id.toString() }); await showResult(id);
-    } catch (error) { setPhase("error"); setMessage(error instanceof Error ? error.message : "Could not submit the arrangement."); }
+    } catch (error) { setPhase("error"); notify("error", errorText(error, "Could not submit the arrangement.")); }
   }
 
   async function recover() {
@@ -132,11 +157,11 @@ export function useClassicSession() {
       await create(); return;
     }
     try {
-      const game = await publicClient.readContract({ address: contractAddress, abi: [{ type: "function", name: "getGame", stateMutability: "view", inputs: [{ name: "gameId", type: "uint256" }], outputs: [{ name: "player", type: "address" }, { name: "status", type: "uint8" }, { name: "createdAt", type: "uint256" }, { name: "hasSubmission", type: "bool" }, { name: "submittedAt", type: "uint256" }] }] as const, functionName: "getGame", args: [id] });
-      if (game[3]) await showResult(id); else await reveal(id);
-    } catch (error) { setPhase("error"); setMessage(error instanceof Error ? error.message : "Could not recover the game."); }
+      const game = await publicClient.readContract({ address: contractAddress, abi: colorSnapArcadeAbi, functionName: "getGame", args: [id] }) as readonly [Hex, number, number, bigint, boolean, boolean];
+      if (game[2] === 2) await showResult(id); else await reveal(id);
+    } catch (error) { setPhase("error"); notify("error", errorText(error, "Could not recover the game.")); }
   }
 
-  function reset() { save({ dismissed: true }); setId(undefined); setTarget([]); setPieces(START); setSelected(undefined); setPhase("idle"); setMessage("Create a puzzle to begin."); }
-  return { id, target, pieces, selected, phase, message, choose, create, submit, recover, reset };
+  function reset() { save({ dismissed: true }); setId(undefined); setTarget([]); setPieces(Array.from({ length: size }, (_, i) => i)); setSelected(undefined); setPhase("idle"); setMessage("Create a puzzle to begin."); }
+  return { id, target, pieces, selected, size, completedGames, points, phase, message, choose, create, submit, recover, reset };
 }
